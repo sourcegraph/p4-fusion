@@ -243,8 +243,7 @@ int Main(int argc, char** argv)
 		SUCCESS("Repository is up to date. Exiting.");
 		return 0;
 	}
-	size_t changelistCount = changes.size();
-	SUCCESS("Found " << changelistCount << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
+	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
 
 	PRINT("Creating " << networkThreads << " network threads");
 	ThreadPool pool;
@@ -268,32 +267,47 @@ int Main(int argc, char** argv)
 		}
 	);
 
-	// Go in the chronological order
-	size_t lastDownloadedCL = 0;
-	int startupDownloadsCount = 0;
-	for (size_t currentCL = 0; currentCL < changelistCount && currentCL < lookAhead; currentCL++)
+	// Go in the chronological order.
+	std::atomic<int> downloaded;
+	downloaded.store(0);
+	int startupDownloadsCount = lookAhead;
+	if (lookAhead > changes.size()) {
+		startupDownloadsCount = changes.size();
+	}
+	// First, we enqueue the initial set of changelists for download, at most
+	// lookAhead jobs.
+	for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		pool.AddJob([&cl, &branchSet, printBatch](P4API* p4)
+		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API* p4)
+		{
+			cl.PrepareDownload(p4, branchSet);
+		});
+	}
+	for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
+	{
+		ChangeList& cl = changes.at(currentCL);
+
+		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API* p4)
 		{
 			cl.StartDownload(p4, branchSet, printBatch);
+			// Mark download as done.
+			downloaded++;
 		});
-
-		lastDownloadedCL = currentCL;
-		startupDownloadsCount++;
 	}
 
-	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(lastDownloadedCL).number << " for downloading");
+	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(startupDownloadsCount-1).number << " for downloading");
 
 	// Commit procedure start
 	Timer commitTimer;
 
-	for (size_t i = 0; i < changelistCount; i++)
+	for (size_t i = 0; i < changes.size(); i++)
 	{
 		ChangeList& cl = changes.at(i);
 
 		// Ensure the files are downloaded before committing them to the repository
+		PRINT("Waiting for download of CL " << cl.number << " to complete");
 		cl.WaitForDownload();
 
 		std::string fullName = cl.user;
@@ -358,22 +372,24 @@ int Main(int argc, char** argv)
 		}
 		SUCCESS(
 		    "CL " << cl.number << " with "
-		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << changelistCount
-		          << "|" << lastDownloadedCL - (long long)i
+		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << changes.size()
+		          << "|" << downloaded
 		          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
-		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (changelistCount - i - 1) << " mins left.");
+		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (changes.size() - i - 1) << " mins left.");
 		// Clear out finished changelist.
 		cl.Clear();
 
-		// Start downloading the CL chronologically after the last CL that was previously downloaded, if there's still some left
-		// TODO: We should start loading more data as soon as some download finished, IMO.
-		if (lastDownloadedCL + 1 < changelistCount)
+		// Once a cl has been downloaded, we check if we can enqueue a new job
+		// right away.
+		size_t next = startupDownloadsCount + i + 1;
+		if (next < changes.size())
 		{
-			lastDownloadedCL++;
-			ChangeList& downloadCL = changes.at(lastDownloadedCL);
-			pool.AddJob([&downloadCL, &branchSet, printBatch](P4API* p4)
+			ChangeList& downloadCL = changes.at(next);
+			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API* p4)
 			{
 				downloadCL.StartDownload(p4, branchSet, printBatch);
+				// Mark download as done.
+				downloaded++;
 			});
 		}
 

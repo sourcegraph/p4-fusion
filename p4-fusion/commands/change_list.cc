@@ -23,8 +23,9 @@ ChangeList::ChangeList(const std::string& clNumber, const std::string& clDescrip
 {
 }
 
-void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch)
+void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 {
+	downloadPrepared = true;
 	std::vector<FileData> changedFiles;
 	if (branchSet.HasMergeableBranch())
 	{
@@ -53,6 +54,14 @@ void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int&
 	}
 
 	*filesDownloaded = 0;
+}
+
+void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch)
+{
+	if (!downloadPrepared)
+	{
+		PrepareDownload(p4, branchSet);
+	}
 
 	std::shared_ptr<std::vector<std::string>> printBatchFiles = std::make_shared<std::vector<std::string>>();
 	std::shared_ptr<std::vector<FileData*>> printBatchFileData = std::make_shared<std::vector<FileData*>>();

@@ -36,10 +36,12 @@ struct ChangeList
 	ChangeList& operator=(ChangeList&&) = default;
 	~ChangeList() = default;
 
+	void PrepareDownload(P4API* p4, const BranchSet& branchSet);
 	void StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch);
 	void WaitForDownload();
 	void Clear();
 
 private:
 	void Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData);
+	bool downloadPrepared;
 };
