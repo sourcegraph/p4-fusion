@@ -75,7 +75,6 @@ public:
 	Result Sync();
 	Result Sync(const std::string& path);
 	SyncResult GetFilesToSyncAtCL(const std::string& path, const std::string& cl);
-	PrintResult PrintFile(const std::string& filePathRevision);
 	PrintResult PrintFiles(const std::vector<std::string>& fileRevisions);
 	void UpdateClientSpec();
 	ClientResult Client();

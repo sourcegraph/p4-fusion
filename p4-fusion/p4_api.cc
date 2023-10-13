@@ -276,13 +276,6 @@ SyncResult P4API::GetFilesToSyncAtCL(const std::string& path, const std::string&
 	                               });
 }
 
-PrintResult P4API::PrintFile(const std::string& filePathRevision)
-{
-	return Run<PrintResult>("print", {
-	                                     filePathRevision,
-	                                 });
-}
-
 PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions)
 {
 	MTR_SCOPE("P4", __func__);
