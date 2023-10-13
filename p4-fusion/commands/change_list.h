@@ -14,6 +14,8 @@
 #include "common.h"
 #include "../branch_set.h"
 
+class P4API;
+
 struct ChangeList
 {
 	std::string number;
@@ -28,14 +30,16 @@ struct ChangeList
 
 	ChangeList(const std::string& number, const std::string& description, const std::string& user, const int64_t& timestamp);
 
-	ChangeList(const ChangeList& other) = default;
+	ChangeList(const ChangeList& other) = delete;
 	ChangeList& operator=(const ChangeList&) = delete;
 	ChangeList(ChangeList&&) = default;
 	ChangeList& operator=(ChangeList&&) = default;
 	~ChangeList() = default;
 
-	void StartDownload(const BranchSet& branchSet, const int& printBatch);
-	void Flush(std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData);
+	void StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch);
 	void WaitForDownload();
 	void Clear();
+
+private:
+	void Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData);
 };

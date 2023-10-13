@@ -243,24 +243,26 @@ int Main(int argc, char** argv)
 		SUCCESS("Repository is up to date. Exiting.");
 		return 0;
 	}
-	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
+	size_t changelistCount = changes.size();
+	SUCCESS("Found " << changelistCount << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
 
 	PRINT("Creating " << networkThreads << " network threads");
-	ThreadPool::GetSingleton()->Initialize(networkThreads);
-	SUCCESS("Created " << ThreadPool::GetSingleton()->GetThreadCount() << " threads in thread pool");
+	ThreadPool pool;
+	pool.Initialize(networkThreads);
+	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
 
-	auto t = std::thread([]()
+	auto t = std::thread([&pool]()
 		{
 			// See if the threadpool encountered any exceptions.
 			try
 			{
-				ThreadPool::GetSingleton()->RaiseCaughtExceptions();
+				pool.RaiseCaughtExceptions();
 			}
 			catch (const std::exception& e)
 			{
 				// This is unrecoverable
 				ERR("Threadpool encountered an exception: " << e.what());
-				ThreadPool::GetSingleton()->ShutDown();
+				pool.ShutDown();
 				std::exit(1);
 			}
 		}
@@ -269,26 +271,25 @@ int Main(int argc, char** argv)
 	// Go in the chronological order
 	size_t lastDownloadedCL = 0;
 	int startupDownloadsCount = 0;
-	for (size_t currentCL = 0; currentCL < changes.size() && currentCL < lookAhead; currentCL++)
+	for (size_t currentCL = 0; currentCL < changelistCount && currentCL < lookAhead; currentCL++)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		// Start gathering changed files with `p4 describe` or `p4 filelog`
-		cl.StartDownload(branchSet, printBatch);
+		pool.AddJob([&cl, &branchSet, printBatch](P4API* p4)
+		{
+			cl.StartDownload(p4, branchSet, printBatch);
+		});
 
 		lastDownloadedCL = currentCL;
 		startupDownloadsCount++;
 	}
 
-	// TODO: startupDownloadsCount is always 0.
 	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(lastDownloadedCL).number << " for downloading");
 
 	// Commit procedure start
 	Timer commitTimer;
 
-	PRINT("Last CL to start downloading is CL " << changes.at(lastDownloadedCL).number);
-
-	for (size_t i = 0; i < changes.size(); i++)
+	for (size_t i = 0; i < changelistCount; i++)
 	{
 		ChangeList& cl = changes.at(i);
 
@@ -357,19 +358,23 @@ int Main(int argc, char** argv)
 		}
 		SUCCESS(
 		    "CL " << cl.number << " with "
-		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << changes.size()
+		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << changelistCount
 		          << "|" << lastDownloadedCL - (long long)i
 		          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
-		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (changes.size() - i - 1) << " mins left.");
+		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (changelistCount - i - 1) << " mins left.");
 		// Clear out finished changelist.
 		cl.Clear();
 
 		// Start downloading the CL chronologically after the last CL that was previously downloaded, if there's still some left
-		if (lastDownloadedCL + 1 < changes.size())
+		// TODO: We should start loading more data as soon as some download finished, IMO.
+		if (lastDownloadedCL + 1 < changelistCount)
 		{
 			lastDownloadedCL++;
 			ChangeList& downloadCL = changes.at(lastDownloadedCL);
-			downloadCL.StartDownload(branchSet, printBatch);
+			pool.AddJob([&downloadCL, &branchSet, printBatch](P4API* p4)
+			{
+				downloadCL.StartDownload(p4, branchSet, printBatch);
+			});
 		}
 
 		// Occasionally flush the profiling data
@@ -383,8 +388,9 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
 
-	ThreadPool::GetSingleton()->ShutDown();
+	pool.ShutDown();
 
+	// Wait for exception handler to finish.
 	t.join();
 
 	if (!P4API::ShutdownLibraries())
@@ -411,7 +417,8 @@ void SignalHandler(sig_atomic_t s)
 
 	ERR("Signal Received: " << strsignal(s));
 
-	ThreadPool::GetSingleton()->ShutDown();
+	// TODO: Propagate cancel signal to main function.
+	// pool.ShutDown();
 
 	std::exit(s);
 }

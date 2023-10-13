@@ -13,14 +13,14 @@
 
 #include "minitrace.h"
 
-ThreadPool* ThreadPool::GetSingleton()
-{
-	static ThreadPool singleton;
-	return &singleton;
-}
-
 void ThreadPool::AddJob(Job function)
 {
+	// Check if we want to accept more work.
+	if (m_HasShutDownBeenCalled)
+	{
+		return;
+	}
+
 	{
 		std::unique_lock<std::mutex> lock(m_JobsMutex);
 		m_Jobs.push_back(function);

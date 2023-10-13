@@ -43,8 +43,6 @@ class ThreadPool
 	bool m_HasShutDownBeenCalled;
 
 public:
-	static ThreadPool* GetSingleton();
-
 	~ThreadPool();
 
 	void Initialize(int size);
