@@ -38,7 +38,7 @@ int Main(int argc, char** argv)
 	Arguments::GetSingleton()->RequiredParameter("--port", "Specify which P4PORT to use.");
 	Arguments::GetSingleton()->RequiredParameter("--user", "Specify which P4USER to use. Please ensure that the user is logged in.");
 	Arguments::GetSingleton()->RequiredParameter("--client", "Name/path of the client workspace specification.");
-	Arguments::GetSingleton()->RequiredParameter("--lookAhead", "How many CLs in the future, at most, shall we keep downloaded by the time it is to commit them?");
+	Arguments::GetSingleton()->OptionalParameter("--lookAhead", "1", "How many CLs in the future, at most, shall we keep downloaded by the time it is to commit them?");
 	Arguments::GetSingleton()->OptionalParameterList("--branch", "A branch to migrate under the depot path.  May be specified more than once.  If at least one is given and the noMerge option is false, then the Git repository will include merges between branches in the history.  You may use the formatting 'depot/path:git-alias', separating the Perforce branch sub-path from the git alias name by a ':'; if the depot path contains a ':', then you must provide the git branch alias.");
 	Arguments::GetSingleton()->OptionalParameter("--noMerge", "false", "Disable performing a Git merge when a Perforce branch integrates (or copies, etc) into another branch.");
 	Arguments::GetSingleton()->OptionalParameter("--networkThreads", std::to_string(std::thread::hardware_concurrency()), "Specify the number of threads in the threadpool for running network calls. Defaults to the number of logical CPUs.");
@@ -57,7 +57,7 @@ int Main(int argc, char** argv)
 	if (!Arguments::GetSingleton()->IsValid())
 	{
 		PRINT("Usage:" + Arguments::GetSingleton()->Help());
-		return 0;
+		return 1;
 	}
 
 	const bool noColor = Arguments::GetSingleton()->GetNoColor() != "false";
@@ -82,24 +82,23 @@ int Main(int argc, char** argv)
 	{
 		return 1;
 	}
-	// Set the signal here because it gets reset after P4API library is initialized
+
+	// Set the signal here because it gets reset after P4API library is initialized.
 	std::signal(SIGINT, SignalHandler);
 	std::signal(SIGTERM, SignalHandler);
 
 	P4API::P4PORT = Arguments::GetSingleton()->GetPort();
 	P4API::P4USER = Arguments::GetSingleton()->GetUsername();
 
-	const Error& serviceConnectionResult = P4API().TestConnection(5).GetError();
-	bool serverAvailable = serviceConnectionResult.IsError() == 0;
-	if (serverAvailable)
+	TestResult serviceConnectionResult = P4API().TestConnection(5);
+	if (serviceConnectionResult.HasError())
 	{
-		SUCCESS("Perforce server is available");
-	}
-	else
-	{
-		ERR("Error occurred while connecting to " << P4API::P4PORT);
+		ERR("Error occurred while connecting to " << P4API::P4PORT << ": " << serviceConnectionResult.PrintError());
 		return 1;
 	}
+
+	SUCCESS("Perforce server is available");
+
 	P4API::P4CLIENT = Arguments::GetSingleton()->GetClient();
 	P4API::ClientSpec = P4API().Client().GetClientSpec();
 
@@ -111,6 +110,14 @@ int Main(int argc, char** argv)
 	PRINT("Updated client workspace view " << P4API::ClientSpec.client << " with " << P4API::ClientSpec.mapping.size() << " mappings");
 
 	P4API p4;
+
+	InfoResult p4infoRes = p4.Info();
+	if (p4infoRes.HasError()) {
+		ERR("Failed to fetch Perforce server timezone: " << p4infoRes.PrintError());
+		return 1;
+	}
+	int timezoneMinutes = p4infoRes.GetServerTimezoneMinutes();
+	SUCCESS("Perforce server timezone is " << timezoneMinutes << " minutes");
 
 	if (!p4.IsDepotPathValid(depotPath))
 	{
@@ -164,6 +171,13 @@ int Main(int argc, char** argv)
 	profiling = true;
 #endif
 
+	// Setup trace file generation
+	const std::string tracePath = (srcPath + (srcPath.back() == '/' ? "" : "/") + "trace.json");
+	mtr_init(tracePath.c_str());
+	MTR_META_PROCESS_NAME("p4-fusion");
+	MTR_META_THREAD_NAME("Main Thread");
+	MTR_META_THREAD_SORT_INDEX(0);
+
 	PRINT("Perforce Port: " << P4API::P4PORT);
 	PRINT("Perforce User: " << P4API::P4USER);
 	PRINT("Perforce Client: " << P4API::P4CLIENT);
@@ -176,7 +190,7 @@ int Main(int argc, char** argv)
 	PRINT("Refresh Threshold: " << refreshStr);
 	PRINT("Fsync Enable: " << fsyncEnable);
 	PRINT("Include Binaries: " << includeBinaries);
-	PRINT("Profiling: " << profiling);
+	PRINT("Profiling: " << profiling << " (" << tracePath << ")");
 	PRINT("Profiling Flush Rate: " << flushRate);
 	PRINT("No Colored Output: " << noColor);
 	PRINT("Inspecting " << branchSet.Count() << " branches");
@@ -188,12 +202,6 @@ int Main(int argc, char** argv)
 		ERR("Could not initialize Git repository. Exiting.");
 		return 1;
 	}
-
-	// Setup trace file generation
-	mtr_init((srcPath + (srcPath.back() == '/' ? "" : "/") + "trace.json").c_str());
-	MTR_META_PROCESS_NAME("p4-fusion");
-	MTR_META_THREAD_NAME("Main Thread");
-	MTR_META_THREAD_SORT_INDEX(0);
 
 	std::string resumeFromCL;
 	if (git.IsHEADExists())
@@ -208,28 +216,42 @@ int Main(int argc, char** argv)
 		WARN("Detected last CL committed as CL " << resumeFromCL);
 	}
 
+	// Prepare the repository.
+	git.CreateIndex();
+
+	// Load mapping data from usernames to emails.
+	PRINT("Requesting userbase details from the Perforce server");
+	UsersResult usersRes = p4.Users();
+	if (usersRes.HasError()) {
+		ERR("Failed to retrieve user details for mapping: " << usersRes.PrintError());
+		return 1;
+	}
+	const std::unordered_map<UsersResult::UserID, UsersResult::UserData> users = std::move(usersRes.GetUserEmails());
+	SUCCESS("Received " << users.size() << " userbase details from the Perforce server");
+
+	// Request changelists.
 	PRINT("Requesting changelists to convert from the Perforce server");
-
-	std::vector<ChangeList> changes = std::move(p4.Changes(depotPath, resumeFromCL, maxChanges).GetChanges());
-
+	ChangesResult changesRes = p4.Changes(depotPath, resumeFromCL, maxChanges);
+	if (changesRes.HasError()) {
+		ERR("Failed to list changes: " << changesRes.PrintError());
+		return 1;
+	}
+	std::vector<ChangeList> changes = std::move(changesRes.GetChanges());
 	// Return early if we have no work to do
 	if (changes.empty())
 	{
 		SUCCESS("Repository is up to date. Exiting.");
 		return 0;
 	}
-
-	// The changes are received in chronological order
 	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
 
 	PRINT("Creating " << networkThreads << " network threads");
 	ThreadPool::GetSingleton()->Initialize(networkThreads);
 	SUCCESS("Created " << ThreadPool::GetSingleton()->GetThreadCount() << " threads in thread pool");
 
-	int startupDownloadsCount = 0;
-
 	// Go in the chronological order
 	size_t lastDownloadedCL = 0;
+	int startupDownloadsCount = 0;
 	for (size_t currentCL = 0; currentCL < changes.size() && currentCL < lookAhead; currentCL++)
 	{
 		ChangeList& cl = changes.at(currentCL);
@@ -238,6 +260,7 @@ int Main(int argc, char** argv)
 		cl.PrepareDownload(branchSet);
 
 		lastDownloadedCL = currentCL;
+		startupDownloadsCount++;
 	}
 
 	// This is intentionally put in a separate loop.
@@ -251,21 +274,14 @@ int Main(int argc, char** argv)
 		cl.StartDownload(printBatch);
 	}
 
+	// TODO: startupDownloadsCount is always 0.
 	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(lastDownloadedCL).number << " for downloading");
-
-	int timezoneMinutes = p4.Info().GetServerTimezoneMinutes();
-	SUCCESS("Perforce server timezone is " << timezoneMinutes << " minutes");
-
-	// Map usernames to emails
-	const std::unordered_map<UsersResult::UserID, UsersResult::UserData> users = std::move(p4.Users().GetUserEmails());
-	SUCCESS("Received userbase details from the Perforce server");
 
 	// Commit procedure start
 	Timer commitTimer;
 
 	PRINT("Last CL to start downloading is CL " << changes.at(lastDownloadedCL).number);
 
-	git.CreateIndex();
 	for (size_t i = 0; i < changes.size(); i++)
 	{
 		// See if the threadpool encountered any exceptions
@@ -373,6 +389,7 @@ int Main(int argc, char** argv)
 		// Deallocate this CL's metadata from memory
 		cl.Clear();
 	}
+
 	git.CloseIndex();
 
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
@@ -384,6 +401,7 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
+	// Finalize tracing.
 	mtr_flush();
 	mtr_shutdown();
 

@@ -24,20 +24,9 @@ void ThreadPool::AddJob(Job function)
 	{
 		std::unique_lock<std::mutex> lock(m_JobsMutex);
 		m_Jobs.push_back(function);
-		m_JobsProcessing++;
 	}
+	// Inform the next available job handler that there's new work.
 	m_CV.notify_one();
-}
-
-void ThreadPool::Wait()
-{
-	while (true)
-	{
-		if (m_JobsProcessing == 0)
-		{
-			return;
-		}
-	}
 }
 
 void ThreadPool::RaiseCaughtExceptions()
@@ -67,74 +56,70 @@ void ThreadPool::ShutDown()
 	}
 	m_CV.notify_all();
 
+	// Wait for all worker threads to finish.
 	for (auto& thread : m_Threads)
 	{
-		thread.join();
+		thread.m_T.join();
 	}
 
 	m_Threads.clear();
 	m_ThreadExceptions.clear();
-	m_ThreadNames.clear();
-	m_P4Contexts.clear();
 
 	SUCCESS("Thread pool shut down successfully");
-}
-
-void ThreadPool::Resize(int size)
-{
-	ShutDown();
-	Initialize(size);
 }
 
 void ThreadPool::Initialize(int size)
 {
 	m_HasShutDownBeenCalled = false;
 	m_ShouldStop = false;
-	m_JobsProcessing = 0;
 
-	m_P4Contexts.resize(size);
+	// Fill the vector of exceptions with nulls.
+	m_ThreadExceptions.resize(size);
+	
+	// Initialize the thread handlers;
+	m_Threads.resize(size);
 
 	for (int i = 0; i < size; i++)
 	{
-		m_ThreadExceptions.push_back(nullptr);
-		m_ThreadNames.push_back("Worker #" + std::to_string(i));
-		m_Threads.push_back(std::thread([this, i]()
-		    {
-			    MTR_META_THREAD_NAME(m_ThreadNames.at(i).c_str());
+		Thread& t = m_Threads[i];
+		t.m_T = std::thread([this, &t, i]()
+			{
+				// Add some human-readable info to the tracing.
+				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
 
-			    P4API* localP4 = &m_P4Contexts[i];
+				// Job queue, we keep looking for new jobs until the shutdown
+				// event.
+				while (true)
+				{
+					Job job;
+					{
+						std::unique_lock<std::mutex> lock(m_JobsMutex);
 
-			    while (true)
-			    {
-				    Job job;
-				    {
-					    std::unique_lock<std::mutex> lock(m_JobsMutex);
+						m_CV.wait(lock, [this]()
+							{ return !m_Jobs.empty() || m_ShouldStop; });
 
-					    m_CV.wait(lock, [this]()
-					        { return !m_Jobs.empty() || m_ShouldStop; });
+						if (m_ShouldStop)
+						{
+							break;
+						}
 
-					    if (m_ShouldStop)
-					    {
-						    break;
-					    }
+						job = m_Jobs.front();
+						m_Jobs.pop_front();
+					}
 
-					    job = m_Jobs.front();
-					    m_Jobs.pop_front();
-				    }
+					try
+					{
+						job(&t.m_P4);
+					}
+					catch (const std::exception& e)
+					{
+						std::unique_lock<std::mutex> lock(m_ThreadExceptionsMutex);
 
-				    try
-				    {
-					    job(localP4);
-				    }
-				    catch (const std::exception& e)
-				    {
-					    std::unique_lock<std::mutex> lock(m_ThreadExceptionsMutex);
-
-					    m_ThreadExceptions[i] = std::current_exception();
-				    }
-				    m_JobsProcessing--;
-			    }
-		    }));
+						m_ThreadExceptions[i] = std::current_exception();
+					}
+				}
+			}
+		);
 	}
 }
 

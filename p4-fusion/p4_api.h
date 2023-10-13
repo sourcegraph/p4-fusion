@@ -49,7 +49,7 @@ public:
 	static int CommandRefreshThreshold;
 
 	// Helix Core C++ API seems to crash while making connections parallely.
-	static std::mutex InitializationMutex;
+	// static std::mutex InitializationMutex;
 
 	static bool InitializeLibraries();
 	static bool ShutdownLibraries();
@@ -66,9 +66,7 @@ public:
 
 	TestResult TestConnection(const int retries);
 	ChangesResult ShortChanges(const std::string& path);
-	ChangesResult Changes(const std::string& path);
 	ChangesResult Changes(const std::string& path, const std::string& from, int32_t maxCount);
-	ChangesResult ChangesFromTo(const std::string& path, const std::string& from, const std::string& to);
 	ChangesResult LatestChange(const std::string& path);
 	ChangesResult OldestChange(const std::string& path);
 	DescribeResult Describe(const std::string& cl);

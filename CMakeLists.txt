@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-option(MTR_ENABLED "Enable minitrace profiling" OFF)
+option(MTR_ENABLED "Enable minitrace profiling" ON)
 option(BUILD_TESTS "Build tests" OFF)
 
 set(CXX_STANDARD_REQUIRED true)
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 project(
     p4-fusion

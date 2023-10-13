@@ -13,18 +13,25 @@
 #include <condition_variable>
 
 #include "common.h"
+#include "p4_api.h"
 
 class P4API;
 
+class Thread
+{
+public:
+	std::thread m_T;
+	P4API m_P4;
+	std::string m_Name;
+};
+
+typedef std::function<void(P4API*)> Job;
+
 class ThreadPool
 {
-	typedef std::function<void(P4API*)> Job;
-
-	std::vector<std::thread> m_Threads;
+	std::vector<Thread> m_Threads;
 	std::mutex m_ThreadExceptionsMutex;
 	std::vector<std::exception_ptr> m_ThreadExceptions;
-	std::vector<std::string> m_ThreadNames;
-	std::vector<P4API> m_P4Contexts;
 
 	std::deque<Job> m_Jobs;
 	std::mutex m_JobsMutex;
@@ -34,8 +41,6 @@ class ThreadPool
 	std::atomic<bool> m_ShouldStop;
 	bool m_HasShutDownBeenCalled;
 
-	std::atomic<long> m_JobsProcessing;
-
 public:
 	static ThreadPool* GetSingleton();
 
@@ -43,10 +48,7 @@ public:
 
 	void Initialize(int size);
 	void AddJob(Job function);
-	void Wait();
 	void RaiseCaughtExceptions();
 	void ShutDown();
-
-	void Resize(int size);
 	int GetThreadCount() const { return m_Threads.size(); }
 };

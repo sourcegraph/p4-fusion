@@ -20,7 +20,7 @@ std::string P4API::P4USER;
 std::string P4API::P4CLIENT;
 int P4API::CommandRetries = 1;
 int P4API::CommandRefreshThreshold = 1;
-std::mutex P4API::InitializationMutex;
+// std::mutex P4API::InitializationMutex;
 
 P4API::P4API()
 {
@@ -38,7 +38,7 @@ bool P4API::Initialize()
 	MTR_SCOPE("P4", __func__);
 
 	// Helix Core C++ API seems to crash while making connections parallely.
-	std::unique_lock<std::mutex> lock(InitializationMutex);
+	// std::unique_lock<std::mutex> lock(InitializationMutex);
 
 	Error e;
 	StrBuf msg;
@@ -61,7 +61,7 @@ bool P4API::Initialize()
 
 bool P4API::Deinitialize()
 {
-	std::unique_lock<std::mutex> lock(InitializationMutex);
+	// std::unique_lock<std::mutex> lock(InitializationMutex);
 
 	Error e;
 	StrBuf msg;
@@ -122,10 +122,10 @@ bool P4API::CheckErrors(Error& e, StrBuf& msg)
 bool P4API::InitializeLibraries()
 {
 	Error e;
-	StrBuf msg;
 	P4Libraries::Initialize(P4LIBRARIES_INIT_ALL, &e);
 	if (e.Test())
 	{
+		StrBuf msg;
 		e.Fmt(&msg);
 		ERR(msg.Text());
 		ERR("Failed to initialize P4Libraries");
@@ -144,10 +144,10 @@ bool P4API::InitializeLibraries()
 bool P4API::ShutdownLibraries()
 {
 	Error e;
-	StrBuf msg;
 	P4Libraries::Shutdown(P4LIBRARIES_INIT_ALL, &e);
 	if (e.Test())
 	{
+		StrBuf msg;
 		e.Fmt(&msg);
 		ERR(msg.Text());
 		return false;
@@ -179,16 +179,6 @@ ChangesResult P4API::ShortChanges(const std::string& path)
 {
 	return Run<ChangesResult>("changes", {
 	                                         "-r", // Get CLs from earliest to latest
-	                                         "-s", "submitted", // Only include submitted CLs
-	                                         path // Depot path to get CLs from
-	                                     });
-}
-
-ChangesResult P4API::Changes(const std::string& path)
-{
-	MTR_SCOPE("P4", __func__);
-	return Run<ChangesResult>("changes", {
-	                                         "-l", // Get full descriptions instead of sending cut-short ones
 	                                         "-s", "submitted", // Only include submitted CLs
 	                                         path // Depot path to get CLs from
 	                                     });
@@ -228,15 +218,6 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	ChangesResult result = Run<ChangesResult>("changes", args);
 
 	return result;
-}
-
-ChangesResult P4API::ChangesFromTo(const std::string& path, const std::string& from, const std::string& to)
-{
-	std::string pathArg = path + "@" + from + "," + to;
-	return Run<ChangesResult>("changes", {
-	                                         "-s", "submitted", // Only include submitted CLs
-	                                         pathArg // Depot path to get CLs from
-	                                     });
 }
 
 ChangesResult P4API::LatestChange(const std::string& path)

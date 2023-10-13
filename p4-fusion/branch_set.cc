@@ -201,6 +201,8 @@ void branchIntegrationMap::addMerge(const std::string& sourceBranch, const std::
 // Post condition: all returned FileData (e.g. filtered for git commit) have the relativePath set.
 std::unique_ptr<ChangedFileGroups> BranchSet::ParseAffectedFiles(const std::vector<FileData>& cl) const
 {
+	std::unique_lock<std::mutex> lock(*mu);
+
 	branchIntegrationMap branchMap;
 	for (auto& clFileData : cl)
 	{

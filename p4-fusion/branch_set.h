@@ -73,6 +73,8 @@ private:
 	const std::vector<Branch> m_branches;
 	FileMap m_view;
 
+	std::shared_ptr<std::mutex> mu = std::make_shared<std::mutex>();
+
 	// stripBasePath remove the base path from the depot path, or "" if not in the base path.
 	std::string stripBasePath(const std::string& depotPath) const;
 

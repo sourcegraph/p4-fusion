@@ -16,4 +16,18 @@ public:
 	void HandleError(Error* e) override;
 
 	const Error& GetError() const { return m_Error; }
+	bool HasError() const
+	{
+		return GetError().IsError();
+	}
+	std::string PrintError() const
+	{
+		if (!HasError())
+		{
+			return "";
+		}
+		StrBuf str;
+		m_Error.Fmt(&str);
+		return std::string(str.Text());
+	}
 };
