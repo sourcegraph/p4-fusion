@@ -31,13 +31,19 @@ void ThreadPool::AddJob(Job function)
 
 void ThreadPool::RaiseCaughtExceptions()
 {
-	std::unique_lock<std::mutex> lock(m_ThreadExceptionsMutex);
-
-	for (auto& exceptionPtr : m_ThreadExceptions)
+	while (!m_HasShutDownBeenCalled)
 	{
-		if (exceptionPtr)
+		std::unique_lock<std::mutex> lock(m_ThreadExceptionsMutex);
+		m_ThreadExceptionCV.wait(lock);
+
+		while (!m_ThreadExceptions.empty())
 		{
-			std::rethrow_exception(exceptionPtr);
+			std::exception_ptr ex = m_ThreadExceptions.front();
+			m_ThreadExceptions.pop_front();
+			if (ex)
+			{
+				std::rethrow_exception(ex);
+			}
 		}
 	}
 }
@@ -55,6 +61,7 @@ void ThreadPool::ShutDown()
 		m_ShouldStop = true;
 	}
 	m_CV.notify_all();
+	m_ThreadExceptionCV.notify_all();
 
 	// Wait for all worker threads to finish.
 	for (auto& thread : m_Threads)
@@ -73,9 +80,6 @@ void ThreadPool::Initialize(int size)
 	m_HasShutDownBeenCalled = false;
 	m_ShouldStop = false;
 
-	// Fill the vector of exceptions with nulls.
-	m_ThreadExceptions.resize(size);
-	
 	// Initialize the thread handlers;
 	m_Threads.resize(size);
 
@@ -114,8 +118,8 @@ void ThreadPool::Initialize(int size)
 					catch (const std::exception& e)
 					{
 						std::unique_lock<std::mutex> lock(m_ThreadExceptionsMutex);
-
-						m_ThreadExceptions[i] = std::current_exception();
+						m_ThreadExceptions.push_back(std::current_exception());
+						m_ThreadExceptionCV.notify_all();
 					}
 				}
 			}

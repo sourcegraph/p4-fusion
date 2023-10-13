@@ -249,6 +249,23 @@ int Main(int argc, char** argv)
 	ThreadPool::GetSingleton()->Initialize(networkThreads);
 	SUCCESS("Created " << ThreadPool::GetSingleton()->GetThreadCount() << " threads in thread pool");
 
+	auto t = std::thread([]()
+		{
+			// See if the threadpool encountered any exceptions.
+			try
+			{
+				ThreadPool::GetSingleton()->RaiseCaughtExceptions();
+			}
+			catch (const std::exception& e)
+			{
+				// This is unrecoverable
+				ERR("Threadpool encountered an exception: " << e.what());
+				ThreadPool::GetSingleton()->ShutDown();
+				std::exit(1);
+			}
+		}
+	);
+
 	// Go in the chronological order
 	size_t lastDownloadedCL = 0;
 	int startupDownloadsCount = 0;
@@ -257,21 +274,10 @@ int Main(int argc, char** argv)
 		ChangeList& cl = changes.at(currentCL);
 
 		// Start gathering changed files with `p4 describe` or `p4 filelog`
-		cl.PrepareDownload(branchSet);
+		cl.StartDownload(branchSet, printBatch);
 
 		lastDownloadedCL = currentCL;
 		startupDownloadsCount++;
-	}
-
-	// This is intentionally put in a separate loop.
-	// We want to submit `p4 describe` commands before sending any of the `p4 print` commands.
-	// Gives ~15% perf boost.
-	for (size_t currentCL = 0; currentCL <= lastDownloadedCL; currentCL++)
-	{
-		ChangeList& cl = changes.at(currentCL);
-
-		// Start running `p4 print` on changed files when the describe is finished
-		cl.StartDownload(printBatch);
 	}
 
 	// TODO: startupDownloadsCount is always 0.
@@ -284,19 +290,6 @@ int Main(int argc, char** argv)
 
 	for (size_t i = 0; i < changes.size(); i++)
 	{
-		// See if the threadpool encountered any exceptions
-		try
-		{
-			ThreadPool::GetSingleton()->RaiseCaughtExceptions();
-		}
-		catch (const std::exception& e)
-		{
-			// This is unrecoverable
-			ERR("Threadpool encountered an exception: " << e.what());
-			ThreadPool::GetSingleton()->ShutDown();
-			std::exit(1);
-		}
-
 		ChangeList& cl = changes.at(i);
 
 		// Ensure the files are downloaded before committing them to the repository
@@ -376,8 +369,7 @@ int Main(int argc, char** argv)
 		{
 			lastDownloadedCL++;
 			ChangeList& downloadCL = changes.at(lastDownloadedCL);
-			downloadCL.PrepareDownload(branchSet);
-			downloadCL.StartDownload(printBatch);
+			downloadCL.StartDownload(branchSet, printBatch);
 		}
 
 		// Occasionally flush the profiling data
@@ -385,9 +377,6 @@ int Main(int argc, char** argv)
 		{
 			mtr_flush();
 		}
-
-		// Deallocate this CL's metadata from memory
-		cl.Clear();
 	}
 
 	git.CloseIndex();
@@ -395,6 +384,8 @@ int Main(int argc, char** argv)
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
 
 	ThreadPool::GetSingleton()->ShutDown();
+
+	t.join();
 
 	if (!P4API::ShutdownLibraries())
 	{

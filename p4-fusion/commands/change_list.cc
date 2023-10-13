@@ -23,11 +23,11 @@ ChangeList::ChangeList(const std::string& clNumber, const std::string& clDescrip
 {
 }
 
-void ChangeList::PrepareDownload(const BranchSet& branchSet)
+void ChangeList::StartDownload(const BranchSet& branchSet, const int& printBatch)
 {
 	ChangeList& cl = *this;
 
-	ThreadPool::GetSingleton()->AddJob([&cl, &branchSet](P4API* p4)
+	ThreadPool::GetSingleton()->AddJob([&cl, &branchSet, printBatch](P4API* p4)
 	    {
 		    std::vector<FileData> changedFiles;
 		    if (branchSet.HasMergeableBranch())
@@ -39,6 +39,10 @@ void ChangeList::PrepareDownload(const BranchSet& branchSet)
 			    // different changelists than the point-in-time source branch's
 			    // changelist.
 			    const FileLogResult& filelog = p4->FileLog(cl.number);
+				if (filelog.HasError())
+				{
+					throw filelog.PrintError();	
+				}
 			    cl.changedFileGroups = branchSet.ParseAffectedFiles(filelog.GetFileData());
 		    }
 		    else
@@ -46,27 +50,6 @@ void ChangeList::PrepareDownload(const BranchSet& branchSet)
 			    // If we don't care about branches, then p4->Describe is much faster.
 			    const DescribeResult& describe = p4->Describe(cl.number);
 			    cl.changedFileGroups = branchSet.ParseAffectedFiles(describe.GetFileData());
-		    }
-
-		    {
-			    std::unique_lock<std::mutex> lock((*(cl.canDownloadMutex)));
-			    *cl.canDownload = true;
-		    }
-		    cl.canDownloadCV->notify_all();
-	    });
-}
-
-void ChangeList::StartDownload(const int& printBatch)
-{
-	ChangeList& cl = *this;
-
-	ThreadPool::GetSingleton()->AddJob([&cl, printBatch](P4API* p4)
-	    {
-		    // Wait for describe to finish, if it is still running
-		    {
-			    std::unique_lock<std::mutex> lock(*(cl.canDownloadMutex));
-			    cl.canDownloadCV->wait(lock, [&cl]()
-			        { return *(cl.canDownload) == true; });
 		    }
 
 		    *cl.filesDownloaded = 0;
@@ -146,9 +129,6 @@ void ChangeList::Clear()
 	changedFileGroups->Clear();
 
 	filesDownloaded.reset();
-	canDownload.reset();
-	canDownloadMutex.reset();
-	canDownloadCV.reset();
 	commitMutex.reset();
 	commitCV.reset();
 }

@@ -31,7 +31,8 @@ class ThreadPool
 {
 	std::vector<Thread> m_Threads;
 	std::mutex m_ThreadExceptionsMutex;
-	std::vector<std::exception_ptr> m_ThreadExceptions;
+	std::condition_variable m_ThreadExceptionCV;
+	std::deque<std::exception_ptr> m_ThreadExceptions;
 
 	std::deque<Job> m_Jobs;
 	std::mutex m_JobsMutex;
