@@ -381,7 +381,7 @@ int Main(int argc, char** argv)
 
 		// Once a cl has been downloaded, we check if we can enqueue a new job
 		// right away.
-		size_t next = startupDownloadsCount + i + 1;
+		size_t next = startupDownloadsCount + i;
 		if (next < changes.size())
 		{
 			ChangeList& downloadCL = changes.at(next);
