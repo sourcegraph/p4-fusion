@@ -11,6 +11,7 @@
 #include "filelog_result.h"
 #include "print_result.h"
 #include "utils/std_helpers.h"
+#include "minitrace.h"
 
 #include "thread_pool.h"
 
@@ -25,6 +26,8 @@ ChangeList::ChangeList(const std::string& clNumber, const std::string& clDescrip
 
 void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 {
+	MTR_SCOPE("ChangeList", __func__);
+
 	downloadPrepared = true;
 	std::vector<FileData> changedFiles;
 	if (branchSet.HasMergeableBranch())
@@ -58,6 +61,8 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 
 void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch)
 {
+	MTR_SCOPE("ChangeList", __func__);
+
 	if (!downloadPrepared)
 	{
 		PrepareDownload(p4, branchSet);
@@ -105,6 +110,10 @@ void ChangeList::Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> prin
 	if (!printBatchFileData->empty())
 	{
 		const PrintResult& printData = p4->PrintFiles(*printBatchFiles);
+		if (printData.HasError())
+		{
+			throw printData.PrintError();
+		}
 
 		for (int i = 0; i < printBatchFiles->size(); i++)
 		{
