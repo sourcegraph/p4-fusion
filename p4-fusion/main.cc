@@ -213,7 +213,7 @@ int Main(int argc, char** argv)
 		}
 
 		resumeFromCL = git.DetectLatestCL();
-		WARN("Detected last CL committed as CL " << resumeFromCL);
+		SUCCESS("Detected last CL committed as CL " << resumeFromCL);
 	}
 
 	// Prepare the repository.

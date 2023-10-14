@@ -187,7 +187,8 @@ void GitAPI::CreateIndex()
 		git_revwalk_new(&walk, m_Repo);
 		git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL);
 		git_revwalk_push_head(walk);
-		git_revwalk_next(&m_FirstCommitOid, walk);
+		while (git_revwalk_next(&m_FirstCommitOid, walk) != GIT_ITEROVER) {}
+		git_revwalk_free(walk);
 
 		WARN("Loaded index was refreshed to match the tree of the current HEAD commit");
 	}
