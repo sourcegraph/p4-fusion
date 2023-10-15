@@ -17,6 +17,7 @@ int DescribeResult::OutputStatPartial(StrDict* varList)
 	StrPtr* depotFile = varList->GetVar(("depotFile" + indexString).c_str());
 	if (!depotFile)
 	{
+		// TODO: Is this acceptable? Can this cause issues because a file is not found?
 		// Quick exit if the object returned is not a file
 		return 0;
 	}

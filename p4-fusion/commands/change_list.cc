@@ -29,7 +29,6 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 	MTR_SCOPE("ChangeList", __func__);
 
 	downloadPrepared = true;
-	std::vector<FileData> changedFiles;
 	if (branchSet.HasMergeableBranch())
 	{
 		// If we care about branches, we need to run filelog to get where the file came from.
@@ -41,7 +40,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 		const FileLogResult& filelog = p4->FileLog(number);
 		if (filelog.HasError())
 		{
-			throw filelog.PrintError();	
+			throw filelog.PrintError();
 		}
 		changedFileGroups = branchSet.ParseAffectedFiles(filelog.GetFileData());
 	}

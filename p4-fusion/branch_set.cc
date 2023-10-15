@@ -229,6 +229,7 @@ std::unique_ptr<ChangedFileGroups> BranchSet::ParseAffectedFiles(const std::vect
 		{
 			// Not under the depot path.  Shouldn't happen due to the way we
 			// scan for files, but...
+			// TODO: Should this throw an error then?
 			continue;
 		}
 
@@ -241,7 +242,7 @@ std::unique_ptr<ChangedFileGroups> BranchSet::ParseAffectedFiles(const std::vect
 			    branchPath[0].empty()
 			    || branchPath[1].empty())
 			{
-				// not a valid branch file.  skip it.
+				// not a valid branch file. skip it.
 				continue;
 			}
 

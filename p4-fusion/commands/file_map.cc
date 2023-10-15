@@ -34,50 +34,6 @@ bool FileMap::IsInLeft(const std::string fileRevision) const
 	return isInLeft;
 }
 
-bool FileMap::IsInRight(const std::string fileRevision) const
-{
-	StrBuf to;
-	StrBuf from(fileRevision.c_str());
-
-	// MapAPI is poorly written and doesn't declare things as const when it should.
-	MapApi* ref = const_cast<MapApi*>(&m_map);
-	return ref->Translate(from, to);
-}
-
-void FileMap::SetCaseSensitivity(const MapCase mode)
-{
-	m_sensitivity = mode;
-	m_map.SetCaseSensitivity(mode);
-}
-
-std::string FileMap::TranslateLeftToRight(const std::string& path) const
-{
-	StrBuf from(path.c_str());
-	StrBuf to;
-
-	// MapAPI is poorly written and doesn't declare things as const when it should.
-	MapApi* ref = const_cast<MapApi*>(&m_map);
-	if (ref->Translate(from, to, MapDir::MapLeftRight))
-	{
-		return to.Text();
-	}
-	return "";
-}
-
-std::string FileMap::TranslateRightToLeft(const std::string& path) const
-{
-	StrBuf from(path.c_str());
-	StrBuf to;
-
-	// MapAPI is poorly written and doesn't declare things as const when it should.
-	MapApi* ref = const_cast<MapApi*>(&m_map);
-	if (ref->Translate(from, to, MapDir::MapRightLeft))
-	{
-		return to.Text();
-	}
-	return "";
-}
-
 void FileMap::insertMapping(const std::string& left, const std::string& right, const MapType mapType)
 {
 	std::string mapStrLeft = left;
@@ -127,20 +83,6 @@ void FileMap::InsertTranslationMapping(const std::vector<std::string>& mapping)
 	}
 }
 
-void FileMap::InsertPaths(const std::vector<std::string>& paths)
-{
-	for (int i = 0; i < paths.size(); i++)
-	{
-		const std::string& view = paths.at(i);
-		insertMapping(view, view, MapType::MapInclude);
-	}
-}
-
-void FileMap::InsertFileMap(const FileMap& src)
-{
-	src.copyMapApiInto(m_map);
-}
-
 const std::vector<std::string> PATH_PREFIX_DESCRIPTIONS = {
 	// Order is important.
 	"share ",
@@ -149,35 +91,6 @@ const std::vector<std::string> PATH_PREFIX_DESCRIPTIONS = {
 	"import ",
 	"exclude "
 };
-const int PATH_PREFIX_DESCRIPTION_COUNT = 5;
-const int PATH_PREFIX_DESCRIPTION_EXCLUDE_INDEX_START = 4;
-
-void FileMap::InsertPrefixedPaths(const std::string prefix, const std::vector<std::string>& paths)
-{
-	for (int i = 0; i < paths.size(); i++)
-	{
-		MapType mapType = MapType::MapInclude;
-		std::string view = paths.at(i);
-
-		// Some paths, such as the Stream spec, can include a prefix.
-		for (int i = 0; i < PATH_PREFIX_DESCRIPTION_COUNT; i++)
-		{
-			size_t match = view.find(PATH_PREFIX_DESCRIPTIONS[i]);
-			if (match == 0)
-			{
-				if (i >= PATH_PREFIX_DESCRIPTION_EXCLUDE_INDEX_START)
-				{
-					mapType = MapType::MapExclude;
-				}
-				view.erase(PATH_PREFIX_DESCRIPTIONS[i].size());
-				break;
-			}
-		}
-
-		view = prefix + view;
-		insertMapping(view, view, mapType);
-	}
-}
 
 void FileMap::copyMapApiInto(MapApi& map) const
 {

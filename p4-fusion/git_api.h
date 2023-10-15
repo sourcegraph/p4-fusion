@@ -28,13 +28,12 @@ public:
 	~GitAPI();
 
 	bool InitializeRepository(const std::string& srcPath);
-	void OpenRepository(const std::string& repoPath);
 
 	bool IsHEADExists();
-	bool IsRepositoryClonedFrom(const std::string& depotPath);
-	std::string DetectLatestCL();
+	bool IsRepositoryClonedFrom(const std::string& depotPath) const;
+	const std::string DetectLatestCL() const;
 
-	git_oid CreateBlob(const std::vector<char>& data);
+	git_oid CreateBlob(const std::vector<char>& data) const;
 
 	void CreateIndex(bool noCreateBaseCommit);
 	void SetActiveBranch(const std::string& branchName);

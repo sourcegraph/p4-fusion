@@ -42,27 +42,24 @@ GitAPI::~GitAPI()
 	git_libgit2_shutdown();
 }
 
-bool GitAPI::IsRepositoryClonedFrom(const std::string& depotPath)
+bool GitAPI::IsRepositoryClonedFrom(const std::string& depotPath) const
 {
+	// First, resolve the HEAD symbolic ref to a ref.
 	git_oid oid;
 	GIT2(git_reference_name_to_id(&oid, m_Repo, "HEAD"));
 
+	// Next, find the commit the ref is pointing at.
 	git_commit* headCommit = nullptr;
 	GIT2(git_commit_lookup(&headCommit, m_Repo, &oid));
 
 	std::string message = git_commit_message(headCommit);
-	size_t depotPathStart = message.find("depot-paths = \"") + 15;
-	size_t depotPathEnd = message.find("\": change") - 1;
+	size_t depotPathStart = message.rfind("depot-paths = \"") + 15;
+	size_t depotPathEnd = message.find("\": change", depotPathStart) - 1;
 	std::string repoDepotPath = message.substr(depotPathStart, depotPathEnd - depotPathStart + 1) + "...";
 
 	git_commit_free(headCommit);
 
 	return repoDepotPath == depotPath;
-}
-
-void GitAPI::OpenRepository(const std::string& repoPath)
-{
-	GIT2(git_repository_open(&m_Repo, repoPath.c_str()));
 }
 
 bool GitAPI::InitializeRepository(const std::string& srcPath)
@@ -86,17 +83,21 @@ bool GitAPI::InitializeRepository(const std::string& srcPath)
 
 bool GitAPI::IsHEADExists()
 {
+	MTR_SCOPE("Git", __func__);
+
 	git_oid oid;
 	int errorCode = git_reference_name_to_id(&oid, m_Repo, "HEAD");
 	if (errorCode && errorCode != GIT_ENOTFOUND)
 	{
 		GIT2(errorCode);
 	}
-	return errorCode == 0;
+	return errorCode != GIT_ENOTFOUND;
 }
 
 void GitAPI::SetActiveBranch(const std::string& branchName)
 {
+	MTR_SCOPE("Git", __func__);
+
 	if (branchName == m_CurrentBranch)
 	{
 		return;
@@ -114,6 +115,8 @@ void GitAPI::SetActiveBranch(const std::string& branchName)
 	{
 		// Create the branch from the first index.
 		git_commit* firstCommit = nullptr;
+		// TODO: m_FirstCommitOid can be empty if we didn't create a base commit.
+		// In that case, we should probably create a root commit?
 		GIT2(git_commit_lookup(&firstCommit, m_Repo, &m_FirstCommitOid));
 		GIT2(git_branch_create(&branch, m_Repo, branchName.c_str(), firstCommit, 0));
 		git_commit_free(firstCommit);
@@ -143,27 +146,44 @@ void GitAPI::SetActiveBranch(const std::string& branchName)
 	m_CurrentBranch = branchName;
 }
 
-git_oid GitAPI::CreateBlob(const std::vector<char>& data)
+git_oid GitAPI::CreateBlob(const std::vector<char>& data) const
 {
+	MTR_SCOPE("Git", __func__);
+
 	git_oid oid;
 	GIT2(git_blob_create_from_buffer(&oid, m_Repo, data.data(), data.size()));
 	return oid;
 }
 
-std::string GitAPI::DetectLatestCL()
+const std::string GitAPI::DetectLatestCL() const
 {
+	MTR_SCOPE("Git", __func__);
+
+	// Resolve HEAD to a reference.
 	git_oid oid;
 	GIT2(git_reference_name_to_id(&oid, m_Repo, "HEAD"));
 
+	// Next, get the commit that the HEAD reference is pointing at.
 	git_commit* headCommit = nullptr;
 	GIT2(git_commit_lookup(&headCommit, m_Repo, &oid));
 
-	std::string message = git_commit_message(headCommit);
 	// Look for the specific change message generated from the Commit method.
 	// Note that extra branching information can be added after it.
 	// ": change = " is 11 characters long.
-	size_t clStart = message.rfind(": change = ") + 11;
+	std::string message = git_commit_message(headCommit);
+	size_t pos = message.find(": change = ");
+	if (pos == std::string::npos)
+	{
+		throw std::invalid_argument("failed to parse commit message, well known section : change =  not found");
+	}
+	// The changelist number starts after 11 characters, the length of ": change = ".
+	size_t clStart = pos + 11;
 	size_t clEnd = message.find(']', clStart);
+	if (clEnd == std::string::npos)
+	{
+		throw std::invalid_argument("failed to parse commit message, well closing ] not found");
+	}
+
 	std::string cl(message, clStart, clEnd - clStart);
 
 	git_commit_free(headCommit);
