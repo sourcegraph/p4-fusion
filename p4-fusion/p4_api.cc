@@ -93,19 +93,9 @@ bool P4API::IsDepotPathValid(const std::string& depotPath)
 	return STDHelpers::EndsWith(depotPath, "/...") && STDHelpers::StartsWith(depotPath, "//");
 }
 
-bool P4API::IsFileUnderDepotPath(const std::string& fileRevision, const std::string& depotPath)
-{
-	return STDHelpers::Contains(fileRevision, depotPath.substr(0, depotPath.size() - 3)); // -3 to remove the trailing "..."
-}
-
 bool P4API::IsDepotPathUnderClientSpec(const std::string& depotPath)
 {
 	return m_ClientMapping.IsInLeft(depotPath);
-}
-
-bool P4API::IsFileUnderClientSpec(const std::string& fileRevision)
-{
-	return m_ClientMapping.IsInRight(fileRevision);
 }
 
 bool P4API::CheckErrors(Error& e, StrBuf& msg)
@@ -160,11 +150,6 @@ void P4API::AddClientSpecView(const std::vector<std::string>& viewStrings)
 	m_ClientMapping.InsertTranslationMapping(viewStrings);
 }
 
-void P4API::UpdateClientSpec()
-{
-	Run<Result>("client", {});
-}
-
 ClientResult P4API::Client()
 {
 	return Run<ClientResult>("client", { "-o" });
@@ -173,15 +158,6 @@ ClientResult P4API::Client()
 TestResult P4API::TestConnection(const int retries)
 {
 	return RunEx<TestResult>("changes", { "-m", "1", "//..." }, retries);
-}
-
-ChangesResult P4API::ShortChanges(const std::string& path)
-{
-	return Run<ChangesResult>("changes", {
-	                                         "-r", // Get CLs from earliest to latest
-	                                         "-s", "submitted", // Only include submitted CLs
-	                                         path // Depot path to get CLs from
-	                                     });
 }
 
 ChangesResult P4API::Changes(const std::string& path, const std::string& from, int32_t maxCount)
@@ -220,26 +196,6 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	return result;
 }
 
-ChangesResult P4API::LatestChange(const std::string& path)
-{
-	MTR_SCOPE("P4", __func__);
-	return Run<ChangesResult>("changes", {
-	                                         "-s", "submitted", // Only include submitted CLs,
-	                                         "-m", "1", // Get top-most change
-	                                         path // Depot path to get CLs from
-	                                     });
-}
-
-ChangesResult P4API::OldestChange(const std::string& path)
-{
-	return Run<ChangesResult>("changes", {
-	                                         "-s", "submitted", // Only include submitted CLs,
-	                                         "-r", // List from earliest to latest
-	                                         "-m", "1", // Get top-most change
-	                                         path // Depot path to get CLs from
-	                                     });
-}
-
 DescribeResult P4API::Describe(const std::string& cl)
 {
 	MTR_SCOPE("P4", __func__);
@@ -257,25 +213,6 @@ FileLogResult P4API::FileLog(const std::string& changelist)
 	                                     });
 }
 
-SizesResult P4API::Size(const std::string& file)
-{
-	return Run<SizesResult>("sizes", { "-a", "-s", file });
-}
-
-Result P4API::Sync()
-{
-	return Run<Result>("sync", {});
-}
-
-SyncResult P4API::GetFilesToSyncAtCL(const std::string& path, const std::string& cl)
-{
-	std::string clCommand = "@" + cl;
-	return Run<SyncResult>("sync", {
-	                                   "-n", // Only preview the files to sync. Don't send file contents...yet
-	                                   clCommand,
-	                               });
-}
-
 PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions)
 {
 	MTR_SCOPE("P4", __func__);
@@ -286,13 +223,6 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions)
 	}
 
 	return Run<PrintResult>("print", fileRevisions);
-}
-
-Result P4API::Sync(const std::string& path)
-{
-	return Run<Result>("sync", {
-	                               path // Sync a particular depot path
-	                           });
 }
 
 UsersResult P4API::Users()
