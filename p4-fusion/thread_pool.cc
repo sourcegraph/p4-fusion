@@ -87,7 +87,7 @@ ThreadPool::ThreadPool(int size)
 	{
 		Thread& t = m_Threads[i];
 		t.m_T = std::thread([this, &t, i]()
-			{
+		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
 
@@ -121,9 +121,7 @@ ThreadPool::ThreadPool(int size)
 						m_ThreadExceptions.push_back(std::current_exception());
 						m_ThreadExceptionCV.notify_all();
 					}
-				}
-			}
-		);
+				} });
 	}
 }
 
