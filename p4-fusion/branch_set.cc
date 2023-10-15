@@ -204,8 +204,6 @@ std::unique_ptr<ChangedFileGroups> BranchSet::ParseAffectedFiles(const std::vect
 {
 	MTR_SCOPE("BranchSet", __func__);
 
-	std::unique_lock<std::mutex> lock(*mu);
-
 	branchIntegrationMap branchMap;
 	for (auto& clFileData : cl)
 	{

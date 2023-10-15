@@ -22,6 +22,8 @@ FileMap::FileMap(const FileMap& src)
 
 bool FileMap::IsInLeft(const std::string fileRevision) const
 {
+	std::unique_lock<std::mutex> lock(*mu);
+
 	MapApi argMap;
 	argMap.SetCaseSensitivity(m_sensitivity);
 	argMap.Insert(StrBuf(fileRevision.c_str()), MapType::MapInclude);
@@ -43,6 +45,8 @@ void FileMap::insertMapping(const std::string& left, const std::string& right, c
 	std::string mapStrRight = right;
 	mapStrRight.erase(mapStrRight.find_last_not_of(' ') + 1);
 	mapStrRight.erase(0, mapStrRight.find_first_not_of(' '));
+
+	std::unique_lock<std::mutex> lock(*mu);
 
 	m_map.Insert(StrBuf(mapStrLeft.c_str()), StrBuf(mapStrRight.c_str()), mapType);
 }
@@ -94,6 +98,8 @@ const std::vector<std::string> PATH_PREFIX_DESCRIPTIONS = {
 
 void FileMap::copyMapApiInto(MapApi& map) const
 {
+	std::unique_lock<std::mutex> lock(*mu);
+
 	// MapAPI is poorly written and doesn't declare things as const when it should.
 	MapApi* ref = const_cast<MapApi*>(&m_map);
 

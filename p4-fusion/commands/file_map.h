@@ -17,6 +17,7 @@ struct FileMap
 private:
 	MapApi m_map;
 	MapCase m_sensitivity;
+	std::shared_ptr<std::mutex> mu = std::make_shared<std::mutex>();
 
 	void insertMapping(const std::string& left, const std::string& right, const MapType mapType);
 	void copyMapApiInto(MapApi& map) const;
