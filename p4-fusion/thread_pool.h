@@ -43,9 +43,10 @@ class ThreadPool
 	bool m_HasShutDownBeenCalled;
 
 public:
+	ThreadPool(int size);
+	ThreadPool() = delete;
 	~ThreadPool();
 
-	void Initialize(int size);
 	void AddJob(Job function);
 	void RaiseCaughtExceptions();
 	void ShutDown();

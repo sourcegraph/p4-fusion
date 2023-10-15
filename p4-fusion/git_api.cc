@@ -67,8 +67,19 @@ void GitAPI::OpenRepository(const std::string& repoPath)
 
 bool GitAPI::InitializeRepository(const std::string& srcPath)
 {
-	GIT2(git_repository_init(&m_Repo, srcPath.c_str(), true));
-	SUCCESS("Initialized Git repository at " << srcPath);
+	if (git_repository_open_bare(&m_Repo, srcPath.c_str()) < 0)
+	{
+		git_repository_init_options opts = GIT_REPOSITORY_INIT_OPTIONS_INIT;
+		opts.flags = GIT_REPOSITORY_INIT_MKPATH | GIT_REPOSITORY_INIT_BARE;
+		opts.initial_head = "main";
+
+		GIT2(git_repository_init_ext(&m_Repo, srcPath.c_str(), &opts));
+		SUCCESS("Initialized Git repository at " << srcPath);
+	}
+	else
+	{
+		SUCCESS("Opened existing Git repository at " << srcPath);
+	}
 
 	return true;
 }
@@ -160,7 +171,7 @@ std::string GitAPI::DetectLatestCL()
 	return cl;
 }
 
-void GitAPI::CreateIndex()
+void GitAPI::CreateIndex(bool noCreateBaseCommit)
 {
 	MTR_SCOPE("Git", __func__);
 
@@ -192,7 +203,7 @@ void GitAPI::CreateIndex()
 
 		WARN("Loaded index was refreshed to match the tree of the current HEAD commit");
 	}
-	else
+	else if (!noCreateBaseCommit)
 	{
 		// In order to have branches be mergable, even with no shared history, we perform
 		// a trick by adding an empty commit as the very first commit, and use this as the base for all branches.

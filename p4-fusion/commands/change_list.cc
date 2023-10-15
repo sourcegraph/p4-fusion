@@ -51,6 +51,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 		const DescribeResult& describe = p4->Describe(number);
 		if (describe.HasError())
 		{
+			ERR("Failed to describe changelist: " << describe.PrintError());
 			throw describe.PrintError();
 		}
 		changedFileGroups = branchSet.ParseAffectedFiles(describe.GetFileData());

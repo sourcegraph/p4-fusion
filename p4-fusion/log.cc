@@ -18,8 +18,8 @@ const char* Log::ColorNormal = COLOR_NORMAL;
 
 void Log::DisableColoredOutput()
 {
-	ColorRed = COLOR_NORMAL;
-	ColorYellow = COLOR_NORMAL;
-	ColorGreen = COLOR_NORMAL;
-	ColorNormal = COLOR_NORMAL;
+	ColorRed = "";
+	ColorYellow = "";
+	ColorGreen = "";
+	ColorNormal = "";
 }

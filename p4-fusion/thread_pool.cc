@@ -75,7 +75,7 @@ void ThreadPool::ShutDown()
 	SUCCESS("Thread pool shut down successfully");
 }
 
-void ThreadPool::Initialize(int size)
+ThreadPool::ThreadPool(int size)
 {
 	m_HasShutDownBeenCalled = false;
 	m_ShouldStop = false;

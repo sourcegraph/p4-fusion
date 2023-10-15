@@ -36,7 +36,7 @@ public:
 
 	git_oid CreateBlob(const std::vector<char>& data);
 
-	void CreateIndex();
+	void CreateIndex(bool noCreateBaseCommit);
 	void SetActiveBranch(const std::string& branchName);
 	void AddFileToIndex(const std::string& relativePath, const std::vector<char>& contents, const bool plusx);
 	void RemoveFileFromIndex(const std::string& relativePath);
