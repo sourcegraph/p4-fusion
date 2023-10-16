@@ -49,7 +49,6 @@ int Main(int argc, char** argv)
 	}
 
 	const bool noMerge = arguments.GetNoMerge();
-
 	const std::string depotPath = arguments.GetDepotPath();
 	const std::string srcPath = arguments.GetSourcePath();
 	const bool fsyncEnable = arguments.GetFsyncEnable();
@@ -92,8 +91,8 @@ int Main(int argc, char** argv)
 
 	if (P4API::ClientSpec.mapping.empty())
 	{
-		WARN("Received a client spec with no mappings. Did you use the correct corresponding P4PORT for the " + P4API::ClientSpec.client + " client spec?");
-		// TODO: Is this not fatal?
+		ERR("Received a client spec with no mappings. Did you use the correct corresponding P4PORT for the " + P4API::ClientSpec.client + " client spec?");
+		return 1;
 	}
 
 	PRINT("Updated client workspace view " << P4API::ClientSpec.client << " with " << P4API::ClientSpec.mapping.size() << " mappings");
@@ -151,9 +150,9 @@ int Main(int argc, char** argv)
 	PRINT("No Colored Output: " << noColor);
 	PRINT("Inspecting " << branchSet.Count() << " branches");
 
-	GitAPI git(fsyncEnable);
+	GitAPI git(fsyncEnable, timezoneMinutes);
 
-	if (!git.InitializeRepository(srcPath))
+	if (!git.InitializeRepository(srcPath, arguments.GetNoBaseCommit()))
 	{
 		ERR("Could not initialize Git repository. Exiting.");
 		return 1;
@@ -178,9 +177,6 @@ int Main(int argc, char** argv)
 		resumeFromCL = git.DetectLatestCL();
 		SUCCESS("Detected last CL committed as CL " << resumeFromCL);
 	}
-
-	// Prepare the repository.
-	git.CreateIndex(arguments.GetNoBaseCommit());
 
 	// Load mapping data from usernames to emails.
 	PRINT("Requesting userbase details from the Perforce server");
@@ -280,26 +276,6 @@ int Main(int argc, char** argv)
 
 		for (auto& branchGroup : cl.changedFileGroups->branchedFileGroups)
 		{
-			if (!branchGroup.targetBranch.empty())
-			{
-				git.SetActiveBranch(branchGroup.targetBranch);
-			}
-
-			for (auto& file : branchGroup.files)
-			{
-				if (file.IsDeleted())
-				{
-					git.RemoveFileFromIndex(file.GetRelativePath());
-				}
-				else
-				{
-					git.AddFileToIndex(file.GetRelativePath(), file.GetContents(), file.IsExecutable());
-				}
-
-				// No use for keeping the contents in memory once it has been added
-				file.Clear();
-			}
-
 			std::string mergeFrom = "";
 			if (branchGroup.hasSource && !noMerge)
 			{
@@ -308,13 +284,13 @@ int Main(int argc, char** argv)
 				mergeFrom = branchGroup.sourceBranch;
 			}
 
-			std::string commitSHA = git.Commit(depotPath,
-			    cl.number,
+			const std::string commitSHA = git.WriteChangelistBranch(
+			    depotPath,
+			    cl,
+			    branchGroup.files,
+			    branchGroup.targetBranch,
 			    fullName,
 			    email,
-			    timezoneMinutes,
-			    cl.description,
-			    cl.timestamp,
 			    mergeFrom);
 
 			// For scripting/testing purposes...
@@ -359,8 +335,6 @@ int Main(int argc, char** argv)
 			mtr_flush();
 		}
 	}
-
-	git.CloseIndex();
 
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
 
