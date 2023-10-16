@@ -57,7 +57,7 @@ void ThreadPool::ShutDown()
 	m_HasShutDownBeenCalled = true;
 
 	{
-		std::unique_lock<std::mutex> lock(m_JobsMutex);
+		std::lock_guard<std::mutex> lock(m_JobsMutex);
 		m_ShouldStop = true;
 	}
 	m_CV.notify_all();
@@ -70,7 +70,11 @@ void ThreadPool::ShutDown()
 	}
 
 	m_Threads.clear();
-	m_ThreadExceptions.clear();
+
+	{
+		std::lock_guard<std::mutex> lock(m_ThreadExceptionsMutex);
+		m_ThreadExceptions.clear();
+	}
 
 	SUCCESS("Thread pool shut down successfully");
 }

@@ -347,6 +347,7 @@ int Main(int argc, char** argv)
 			ChangeList& downloadCL = changes.at(next);
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API* p4)
 			    {
+				downloadCL.PrepareDownload(p4, branchSet);
 				downloadCL.StartDownload(p4, branchSet, printBatch);
 				// Mark download as done.
 				downloaded++; });

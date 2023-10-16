@@ -40,7 +40,7 @@ class ThreadPool
 	std::condition_variable m_CV;
 
 	std::atomic<bool> m_ShouldStop;
-	bool m_HasShutDownBeenCalled;
+	std::atomic<bool> m_HasShutDownBeenCalled;
 
 public:
 	ThreadPool(int size);

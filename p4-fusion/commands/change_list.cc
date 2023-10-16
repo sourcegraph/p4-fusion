@@ -28,7 +28,6 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
-	downloadPrepared = true;
 	if (branchSet.HasMergeableBranch())
 	{
 		// If we care about branches, we need to run filelog to get where the file came from.
@@ -57,15 +56,23 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 	}
 
 	*filesDownloaded = 0;
+	{
+		std::unique_lock<std::mutex> lock(*downloadPreparedMutex);
+		*downloadPrepared = true;
+		downloadPreparedCV->notify_all();
+	}
 }
 
 void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
-	if (!downloadPrepared)
+	// wait for prepare to be finished.
+
 	{
-		PrepareDownload(p4, branchSet);
+		std::unique_lock<std::mutex> lock(*downloadPreparedMutex);
+		downloadPreparedCV->wait(lock, [this]()
+		    { return downloadPrepared->load(); });
 	}
 
 	std::shared_ptr<std::vector<std::string>> printBatchFiles = std::make_shared<std::vector<std::string>>();
@@ -102,6 +109,8 @@ void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int&
 	// Flush any remaining files that were smaller in number than the total batch size.
 	// Additionally, signal the batch processing end.
 	Flush(p4, printBatchFiles, printBatchFileData);
+	*downloadJobsCompleted = true;
+	commitCV->notify_all();
 }
 
 void ChangeList::Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData)
@@ -131,7 +140,7 @@ void ChangeList::WaitForDownload()
 {
 	std::unique_lock<std::mutex> lock(*commitMutex);
 	commitCV->wait(lock, [this]()
-	    { return *(filesDownloaded) == (int)changedFileGroups->totalFileCount; });
+	    { return downloadJobsCompleted->load(); });
 }
 
 void ChangeList::Clear()

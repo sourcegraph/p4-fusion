@@ -26,7 +26,11 @@ struct ChangeList
 
 	std::shared_ptr<std::atomic<int>> filesDownloaded = std::make_shared<std::atomic<int>>(-1);
 	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
+	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
 	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();
+	std::shared_ptr<std::atomic<bool>> downloadPrepared = std::make_shared<std::atomic<bool>>(false);
+	std::shared_ptr<std::mutex> downloadPreparedMutex = std::make_shared<std::mutex>();
+	std::shared_ptr<std::condition_variable> downloadPreparedCV = std::make_shared<std::condition_variable>();
 
 	ChangeList(const std::string& number, const std::string& description, const std::string& user, const int64_t& timestamp);
 
@@ -43,5 +47,4 @@ struct ChangeList
 
 private:
 	void Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData);
-	bool downloadPrepared;
 };
