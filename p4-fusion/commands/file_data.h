@@ -37,8 +37,8 @@ struct FileDataStore
 	// describe/filelog values
 	std::string depotFile;
 	std::string revision;
-	std::string action;
-	std::string type;
+	bool isBinary;
+	bool isExecutable;
 
 	// filelog values
 	//   - empty if not an integration style change
@@ -53,8 +53,8 @@ struct FileDataStore
 	// Derived Values
 	std::string relativePath;
 	FileAction actionCategory;
-	bool isDeleted;
-	bool isIntegrated; // ... or copied, or moved, or ...
+	bool isDeleted {};
+	bool isIntegrated {}; // ... or copied, or moved, or ...
 
 	FileDataStore();
 
@@ -103,8 +103,8 @@ public:
 	bool IsIntegrated() const { return m_data->isIntegrated; };
 	std::string& GetFromDepotFile() const { return m_data->fromDepotFile; };
 
-	bool IsBinary() const;
-	bool IsExecutable() const;
+	bool IsBinary() const { return m_data->isBinary; };
+	bool IsExecutable() const { return m_data->isExecutable; };
 
 	void Clear() { m_data->Clear(); };
 };

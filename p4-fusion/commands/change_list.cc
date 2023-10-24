@@ -15,8 +15,8 @@
 #include "utils/std_helpers.h"
 #include "minitrace.h"
 
-ChangeList::ChangeList(std::string  clNumber, std::string  clDescription, std::string  userID, const int64_t& clTimestamp)
-    : number(std::move(clNumber))
+ChangeList::ChangeList(const int& clNumber, std::string clDescription, std::string userID, const int64_t& clTimestamp)
+    : number(clNumber)
     , user(std::move(userID))
     , description(std::move(clDescription))
     , timestamp(clTimestamp)
@@ -26,7 +26,7 @@ ChangeList::ChangeList(std::string  clNumber, std::string  clDescription, std::s
 
 void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 {
-	MTR_SCOPE("ChangeList", __func__)
+	MTR_SCOPE("ChangeList", __func__);
 
 	if (branchSet.HasMergeableBranch())
 	{
@@ -64,7 +64,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 
 void ChangeList::StartDownload(P4API* p4, const int& printBatch)
 {
-	MTR_SCOPE("ChangeList", __func__)
+	MTR_SCOPE("ChangeList", __func__);
 
 	// wait for prepare to be finished.
 
@@ -94,7 +94,7 @@ void ChangeList::StartDownload(P4API* p4, const int& printBatch)
 						Flush(p4, printBatchFileData);
 
 						// We let go of the refs held by us and create new ones to queue the next batch
-						printBatchFileData = std::make_shared<std::vector<FileData*>>();
+						printBatchFileData->clear();
 						// Now only the thread job has access to the older batch
 					}
 				}
@@ -111,6 +111,8 @@ void ChangeList::StartDownload(P4API* p4, const int& printBatch)
 
 void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData)
 {
+	MTR_SCOPE("ChangeList", __func__);
+
 	std::vector<std::string> fileRevisions;
 	for (auto fileData : *printBatchFileData)
 	{
@@ -125,7 +127,9 @@ void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>&
 
 	long idx = -1;
 	bool flushed = true;
-	PrintResult printResp = p4->PrintFiles(fileRevisions, [&idx, &printBatchFileData, &flushed] {
+	PrintResult printResp = p4->PrintFiles(
+	    fileRevisions, [&idx, &printBatchFileData, &flushed]
+	    {
 		    if (idx == -1)
 		    {
 			    idx++;
@@ -136,8 +140,9 @@ void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>&
 		    printBatchFileData->at(idx)->Finalize();
 		    idx++;
 		    printBatchFileData->at(idx)->StartWrite();
-		    flushed = false;
-	    }, [&idx,&printBatchFileData](const char* contents, int length) {
+		    flushed = false; },
+	    [&idx, &printBatchFileData](const char* contents, int length)
+	    {
 		    printBatchFileData->at(idx)->Write(contents, length);
 	    });
 	if (printResp.HasError())
@@ -152,6 +157,8 @@ void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>&
 
 void ChangeList::WaitForDownload()
 {
+	MTR_SCOPE("ChangeList", __func__);
+	
 	std::unique_lock<std::mutex> lock(*commitMutex);
 	commitCV->wait(lock, [this]()
 	    { return downloadJobsCompleted->load(); });
@@ -159,7 +166,6 @@ void ChangeList::WaitForDownload()
 
 void ChangeList::Clear()
 {
-	number.clear();
 	user.clear();
 	description.clear();
 	changedFileGroups->Clear();

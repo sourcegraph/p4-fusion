@@ -6,7 +6,6 @@
  */
 #include "git_api.h"
 
-#include <cstring>
 #include <cstdlib>
 
 #include "git2.h"
@@ -60,11 +59,11 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 		opts.initial_head = "main";
 
 		GIT2(git_repository_init_ext(&m_Repo, srcPath.c_str(), &opts));
-		SUCCESS("Initialized Git repository at " << srcPath);
+		SUCCESS("Initialized Git repository at " << srcPath)
 	}
 	else
 	{
-		SUCCESS("Opened existing Git repository at " << srcPath);
+		SUCCESS("Opened existing Git repository at " << srcPath)
 	}
 
 	// Now that we have a bare repo (potentially empty), we can go ahead and determine
@@ -72,7 +71,7 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 	// If HEAD exists, we use the root commit of the branch HEAD is pointing to.
 	if (IsHEADExists())
 	{
-		PRINT("Finding root commit for HEAD");
+		PRINT("Finding root commit for HEAD")
 
 		// Walk the graph to find the root commit of the HEAD branch.
 		git_revwalk* walk;
@@ -84,7 +83,7 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 		}
 		git_revwalk_free(walk);
 
-		SUCCESS("Starting from commit " << git_oid_tostr_s(&m_FirstCommitOid));
+		SUCCESS("Starting from commit " << git_oid_tostr_s(&m_FirstCommitOid))
 	}
 	else if (!noCreateBaseCommit)
 	{
@@ -109,7 +108,7 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 		git_tree_free(commitTree);
 		git_index_free(idx);
 
-		WARN("No HEAD commit was found. Created fresh index " << git_oid_tostr_s(&m_FirstCommitOid) << ".");
+		WARN("No HEAD commit was found. Created fresh index " << git_oid_tostr_s(&m_FirstCommitOid) << ".")
 	}
 	else
 	{
@@ -172,14 +171,16 @@ const std::string GitAPI::DetectLatestCL() const
 }
 
 std::string GitAPI::WriteChangelistBranch(
-    const std::string depotPath,
+    const std::string& depotPath,
     const ChangeList& cl,
     std::vector<FileData>& files,
-    const std::string targetBranch,
-    const std::string authorName,
-    const std::string authorEmail,
-    const std::string mergeFrom) const
+    const std::string& targetBranch,
+    const std::string& authorName,
+    const std::string& authorEmail,
+    const std::string& mergeFrom) const
 {
+	MTR_SCOPE("Git", __func__);
+
 	std::string targetBranchRef = "HEAD";
 	git_index* idx;
 
@@ -304,7 +305,7 @@ std::string GitAPI::WriteChangelistBranch(
 		GIT2(git_signature_new(&author, authorName.c_str(), authorEmail.c_str(), cl.timestamp, timezoneMinutes));
 
 		// -3 to remove the trailing "..."
-		std::string commitMsg = cl.number + " - " + cl.description + "\n[p4-fusion: depot-paths = \"" + depotPath.substr(0, depotPath.size() - 3) + "\": change = " + cl.number + "]";
+		std::string commitMsg = std::to_string(cl.number) + " - " + cl.description + "\n[p4-fusion: depot-paths = \"" + depotPath.substr(0, depotPath.size() - 3) + "\": change = " + std::to_string(cl.number) + "]";
 
 		// Find the parent commits.
 		// Order is very important.

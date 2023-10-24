@@ -36,11 +36,11 @@ class GitAPI
 	int timezoneMinutes;
 
 public:
-	GitAPI(const bool fsyncEnable, const int timezoneMinutes);
+	GitAPI(bool fsyncEnable, int timezoneMinutes);
 	GitAPI() = delete;
 	~GitAPI();
 
-	bool InitializeRepository(const std::string& srcPath, const bool noCreateBaseCommit);
+	bool InitializeRepository(const std::string& srcPath, bool noCreateBaseCommit);
 	bool IsHEADExists() const;
 	bool IsRepositoryClonedFrom(const std::string& depotPath) const;
 	/* Checks if a previous commit was made and extracts the corresponding changelist number. */
@@ -48,11 +48,11 @@ public:
 
 	/* files are cleared as they are visited. Empty targetBranch means HEAD. */
 	std::string WriteChangelistBranch(
-	    const std::string depotPath,
+	    const std::string& depotPath,
 	    const ChangeList& cl,
 	    std::vector<FileData>& files,
-	    const std::string targetBranch,
-	    const std::string authorName,
-	    const std::string authorEmail,
-	    const std::string mergeFrom) const;
+	    const std::string& targetBranch,
+	    const std::string& authorName,
+	    const std::string& authorEmail,
+	    const std::string& mergeFrom) const;
 };

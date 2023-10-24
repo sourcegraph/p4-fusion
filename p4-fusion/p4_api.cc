@@ -20,14 +20,13 @@ std::string P4API::P4USER;
 std::string P4API::P4CLIENT;
 int P4API::CommandRetries = 1;
 int P4API::CommandRefreshThreshold = 1;
-// std::mutex P4API::InitializationMutex;
 
 P4API::P4API()
 {
 	if (!Initialize())
 	{
-		ERR("Could not initialize P4API");
-		return;
+		ERR("Could not initialize P4API")
+		throw std::runtime_error("Could not initialize P4API");
 	}
 
 	AddClientSpecView(ClientSpec.mapping);
@@ -36,9 +35,6 @@ P4API::P4API()
 bool P4API::Initialize()
 {
 	MTR_SCOPE("P4", __func__);
-
-	// Helix Core C++ API seems to crash while making connections parallely.
-	// std::unique_lock<std::mutex> lock(InitializationMutex);
 
 	Error e;
 	StrBuf msg;
@@ -52,7 +48,7 @@ bool P4API::Initialize()
 
 	if (!CheckErrors(e, msg))
 	{
-		ERR("Could not initialize Helix Core C/C++ API");
+		ERR("Could not initialize Helix Core C/C++ API")
 		return false;
 	}
 
@@ -61,15 +57,11 @@ bool P4API::Initialize()
 
 bool P4API::Deinitialize()
 {
-	// std::unique_lock<std::mutex> lock(InitializationMutex);
-
 	Error e;
 	StrBuf msg;
 
 	m_ClientAPI.Final(&e);
-	CheckErrors(e, msg);
-
-	return true;
+	return CheckErrors(e, msg);
 }
 
 bool P4API::Reinitialize()
@@ -139,7 +131,7 @@ bool P4API::ShutdownLibraries()
 	{
 		StrBuf msg;
 		e.Fmt(&msg);
-		ERR(msg.Text());
+		ERR(msg.Text())
 		return false;
 	}
 	return true;
@@ -175,7 +167,7 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	{
 		maxCountStr = std::to_string(maxCount);
 
-		args.push_back("-m"); // Only send max this many number of CLs
+		args.emplace_back("-m"); // Only send max this many number of CLs
 		args.push_back(maxCountStr);
 	}
 
@@ -196,30 +188,31 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	return result;
 }
 
-DescribeResult P4API::Describe(const std::string& cl)
+DescribeResult P4API::Describe(const int cl)
 {
 	MTR_SCOPE("P4", __func__);
+
 	return Run<DescribeResult>("describe", { "-s", // Omit the diffs
-	                                           cl });
+	                                           std::to_string(cl) });
 }
 
-FileLogResult P4API::FileLog(const std::string& changelist)
+FileLogResult P4API::FileLog(const int changelist)
 {
 	return Run<FileLogResult>("filelog", {
 	                                         "-c", // restrict output to a single changelist
-	                                         changelist,
+	                                         std::to_string(changelist),
 	                                         "-m1", // don't get the full history, just the first entry.
 	                                         "//..." // rather than require the path to be passed in, just list all files.
 	                                     });
 }
 
-PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std::function<void()> onStat, std::function<void(const char*, int)> onOutput)
+PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput)
 {
-	MTR_SCOPE("P4", __func__)
+	MTR_SCOPE("P4", __func__);
 
 	if (fileRevisions.empty())
 	{
-		return {onStat,onOutput};
+		return { onStat, onOutput };
 	}
 
 	std::string argsString;
@@ -229,12 +222,13 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std
 	}
 
 	std::vector<char*> argsCharArray;
+	argsCharArray.reserve(fileRevisions.size());
 	for (const std::string& arg : fileRevisions)
 	{
 		argsCharArray.push_back((char*)arg.c_str());
 	}
 
-	PrintResult clientUser(onStat,onOutput);
+	PrintResult clientUser(onStat, onOutput);
 
 	m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
 	m_ClientAPI.Run("print", &clientUser);
@@ -247,21 +241,21 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std
 			break;
 		}
 
-		ERR("Connection dropped or command errored, retrying in 5 seconds.");
+		ERR("Connection dropped or command errored, retrying in 5 seconds.")
 		std::this_thread::sleep_for(std::chrono::seconds(5));
 
 		if (Reinitialize())
 		{
-			SUCCESS("Reinitialized P4API");
+			SUCCESS("Reinitialized P4API")
 		}
 		else
 		{
-			ERR("Could not reinitialize P4API");
+			ERR("Could not reinitialize P4API")
 		}
 
-		WARN("Retrying: p4 print" << argsString);
+		WARN("Retrying: p4 print" << argsString)
 
-		clientUser = PrintResult(onStat,onOutput);
+		clientUser = PrintResult(onStat, onOutput);
 
 		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
 		m_ClientAPI.Run("print", &clientUser);
@@ -271,7 +265,7 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std
 
 	if (m_ClientAPI.Dropped() || clientUser.GetError().IsFatal())
 	{
-		ERR("Exiting due to receiving errors even after retrying " << CommandRetries << " times");
+		ERR("Exiting due to receiving errors even after retrying " << CommandRetries << " times")
 		Deinitialize();
 		std::exit(1);
 	}
@@ -282,13 +276,13 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std
 		int refreshRetries = CommandRetries;
 		while (refreshRetries > 0)
 		{
-			WARN("Trying to refresh the connection due to age (" << m_Usage << " > " << CommandRefreshThreshold << ").");
+			WARN("Trying to refresh the connection due to age (" << m_Usage << " > " << CommandRefreshThreshold << ").")
 			if (Reinitialize())
 			{
-				SUCCESS("Connection was refreshed");
+				SUCCESS("Connection was refreshed")
 				break;
 			}
-			ERR("Could not refresh connection due to old age. Retrying in 5 seconds");
+			ERR("Could not refresh connection due to old age. Retrying in 5 seconds")
 			std::this_thread::sleep_for(std::chrono::seconds(5));
 
 			refreshRetries--;
@@ -296,7 +290,7 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std
 
 		if (refreshRetries == 0)
 		{
-			ERR("Could not refresh the connection after " << CommandRetries << " retries. Exiting.");
+			ERR("Could not refresh the connection after " << CommandRetries << " retries. Exiting.")
 			std::exit(1);
 		}
 	}

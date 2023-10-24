@@ -16,3 +16,5 @@ core
 
 # Test output.
 /verify/
+
+/release/

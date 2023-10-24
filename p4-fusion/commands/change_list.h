@@ -18,20 +18,13 @@ class P4API;
 
 struct ChangeList
 {
-	std::string number;
+	int number;
 	std::string user;
 	std::string description;
 	int64_t timestamp = 0;
 	std::unique_ptr<ChangedFileGroups> changedFileGroups = ChangedFileGroups::Empty();
 
-	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
-	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
-	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();
-	std::shared_ptr<std::atomic<bool>> downloadPrepared = std::make_shared<std::atomic<bool>>(false);
-	std::shared_ptr<std::mutex> downloadPreparedMutex = std::make_shared<std::mutex>();
-	std::shared_ptr<std::condition_variable> downloadPreparedCV = std::make_shared<std::condition_variable>();
-
-	ChangeList(std::string  number, std::string  description, std::string  user, const int64_t& timestamp);
+	ChangeList(const int& number, std::string description, std::string user, const int64_t& timestamp);
 	ChangeList() = delete;
 	ChangeList(const ChangeList& other) = delete;
 	ChangeList& operator=(const ChangeList&) = delete;
@@ -46,4 +39,10 @@ struct ChangeList
 
 private:
 	static void Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData);
+	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
+	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
+	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();
+	std::shared_ptr<std::atomic<bool>> downloadPrepared = std::make_shared<std::atomic<bool>>(false);
+	std::shared_ptr<std::mutex> downloadPreparedMutex = std::make_shared<std::mutex>();
+	std::shared_ptr<std::condition_variable> downloadPreparedCV = std::make_shared<std::condition_variable>();
 };

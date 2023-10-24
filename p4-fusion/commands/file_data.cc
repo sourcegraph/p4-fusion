@@ -24,7 +24,8 @@ FileData::FileData(std::string& depotFile, std::string& revision, std::string& a
 	m_data->depotFile = depotFile;
 	m_data->revision = revision;
 	m_data->SetAction(action);
-	m_data->type = type;
+	m_data->isBinary = STDHelpers::Contains(type, "binary");
+	m_data->isExecutable = STDHelpers::Contains(type, "+x");
 	m_data->isBlobOIDSet = false;
 	m_data->isContentsPendingDownload = false;
 }
@@ -60,6 +61,8 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 
 void FileData::StartWrite()
 {
+	MTR_SCOPE("FileData", __func__);
+
 	if (m_data->isBlobOIDSet)
 	{
 		// Do not set the contents.  Assume that
@@ -73,17 +76,21 @@ void FileData::StartWrite()
 
 void FileData::Write(const char* contents, int length)
 {
-	    GIT2(writer->write(writer, contents, length));
+	MTR_SCOPE("FileData", __func__);
+
+	GIT2(writer->write(writer, contents, length));
 }
 
 void FileData::Finalize()
 {
-	    git_oid objId;
-	    GIT2(git_blob_create_from_stream_commit(&objId, writer));
-	    m_data->blobOID = git_oid_tostr_s(&objId);
-	    git_repository_free(repo);
-	    m_data->isBlobOIDSet = true;
-	    m_data->isContentsPendingDownload = false;
+	MTR_SCOPE("FileData", __func__);
+	
+	git_oid objId;
+	GIT2(git_blob_create_from_stream_commit(&objId, writer));
+	m_data->blobOID = git_oid_tostr_s(&objId);
+	git_repository_free(repo);
+	m_data->isBlobOIDSet = true;
+	m_data->isContentsPendingDownload = false;
 }
 
 void FileData::SetPendingDownload()
@@ -99,21 +106,10 @@ void FileData::SetRelativePath(std::string& relativePath)
 	m_data->relativePath = relativePath;
 }
 
-bool FileData::IsBinary() const
-{
-	return STDHelpers::Contains(m_data->type, "binary");
-}
-
-bool FileData::IsExecutable() const
-{
-	return STDHelpers::Contains(m_data->type, "+x");
-}
-
 FileAction extrapolateFileAction(std::string& action);
 
 void FileDataStore::SetAction(std::string fileAction)
 {
-	action = fileAction;
 	actionCategory = extrapolateFileAction(fileAction);
 	switch (actionCategory)
 	{
@@ -152,8 +148,6 @@ void FileDataStore::Clear()
 {
 	depotFile.clear();
 	revision.clear();
-	action.clear();
-	type.clear();
 	fromDepotFile.clear();
 	fromRevision.clear();
 	blobOID.clear();
@@ -212,17 +206,17 @@ FileAction extrapolateFileAction(std::string& action)
 	if (STDHelpers::Contains(action, "delete"))
 	{
 		// Looks like a delete.
-		WARN("Found an unsupported action " << action << "; assuming delete");
+		WARN("Found an unsupported action " << action << "; assuming delete")
 		return FileAction::FileDelete;
 	}
 	if (STDHelpers::Contains(action, "move/"))
 	{
 		// Looks like a new kind of integrate.
-		WARN("Found an unsupported action " << action << "; assuming move/add");
+		WARN("Found an unsupported action " << action << "; assuming move/add")
 		return FileAction::FileMoveAdd;
 	}
 
 	// assume an edit, as it's the safe bet.
-	WARN("Found an unsupported action " << action << "; assuming edit");
+	WARN("Found an unsupported action " << action << "; assuming edit")
 	return FileAction::FileEdit;
 }

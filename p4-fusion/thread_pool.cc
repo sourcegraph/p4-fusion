@@ -5,15 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include "thread_pool.h"
-
 #include "common.h"
-
-#include "utils/arguments.h"
 #include "p4_api.h"
-
 #include "minitrace.h"
 
-void ThreadPool::AddJob(Job function)
+void ThreadPool::AddJob(const Job& function)
 {
 	// Check if we want to accept more work.
 	if (m_HasShutDownBeenCalled)
@@ -76,21 +72,20 @@ void ThreadPool::ShutDown()
 		m_ThreadExceptions.clear();
 	}
 
-	SUCCESS("Thread pool shut down successfully");
+	SUCCESS("Thread pool shut down successfully")
 }
 
 ThreadPool::ThreadPool(int size)
+    : m_HasShutDownBeenCalled(false)
+    , m_ShouldStop(false)
 {
-	m_HasShutDownBeenCalled = false;
-	m_ShouldStop = false;
-
 	// Initialize the thread handlers;
 	m_Threads.resize(size);
 
 	for (int i = 0; i < size; i++)
 	{
 		Thread& t = m_Threads[i];
-		t.m_T = std::thread([this, &t, i]()
+		t.m_T = std::thread([this, &t, &i]()
 		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());

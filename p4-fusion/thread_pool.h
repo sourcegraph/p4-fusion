@@ -22,7 +22,7 @@ class Thread
 public:
 	std::thread m_T;
 	P4API m_P4;
-	std::string m_Name;
+	const std::string m_Name;
 };
 
 typedef std::function<void(P4API*)> Job;
@@ -47,8 +47,8 @@ public:
 	ThreadPool() = delete;
 	~ThreadPool();
 
-	void AddJob(Job function);
+	void AddJob(const Job& function);
 	void RaiseCaughtExceptions();
 	void ShutDown();
-	int GetThreadCount() const { return m_Threads.size(); }
+	size_t GetThreadCount() const { return m_Threads.size(); }
 };
