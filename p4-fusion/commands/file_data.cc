@@ -5,10 +5,15 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include "file_data.h"
+#include "git_api.h"
+#include "git2.h"
+#include "minitrace.h"
+
+std::string FileData::repoPath;
 
 FileDataStore::FileDataStore()
     : actionCategory(FileAction::FileAdd)
-    , isContentsSet(false)
+    , isBlobOIDSet(false)
     , isContentsPendingDownload(false)
 {
 }
@@ -20,7 +25,7 @@ FileData::FileData(std::string& depotFile, std::string& revision, std::string& a
 	m_data->revision = revision;
 	m_data->SetAction(action);
 	m_data->type = type;
-	m_data->isContentsSet = false;
+	m_data->isBlobOIDSet = false;
 	m_data->isContentsPendingDownload = false;
 }
 
@@ -53,24 +58,37 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 	}
 }
 
-void FileData::MoveContentsOnceFrom(const std::vector<char>& contents)
+void FileData::StartWrite()
 {
-	// TODO double-check the thread logic here.  It needs to be thread safe.
-
-	if (m_data->isContentsSet)
+	if (m_data->isBlobOIDSet)
 	{
 		// Do not set the contents.  Assume that
 		// they were already set or, worst case, are currently being set.
 		return;
 	}
-	m_data->isContentsSet = true;
-	m_data->contents = std::move(contents);
-	m_data->isContentsPendingDownload = false;
+
+	GIT2(git_repository_open_bare(&repo, FileData::repoPath.c_str()));
+	GIT2(git_blob_create_from_stream(&writer, repo, nullptr));
+}
+
+void FileData::Write(const char* contents, int length)
+{
+	    GIT2(writer->write(writer, contents, length));
+}
+
+void FileData::Finalize()
+{
+	    git_oid objId;
+	    GIT2(git_blob_create_from_stream_commit(&objId, writer));
+	    m_data->blobOID = git_oid_tostr_s(&objId);
+	    git_repository_free(repo);
+	    m_data->isBlobOIDSet = true;
+	    m_data->isContentsPendingDownload = false;
 }
 
 void FileData::SetPendingDownload()
 {
-	if (!m_data->isContentsSet)
+	if (!m_data->isBlobOIDSet)
 	{
 		m_data->isContentsPendingDownload = true;
 	}
@@ -138,7 +156,7 @@ void FileDataStore::Clear()
 	type.clear();
 	fromDepotFile.clear();
 	fromRevision.clear();
-	contents.clear();
+	blobOID.clear();
 	relativePath.clear();
 }
 

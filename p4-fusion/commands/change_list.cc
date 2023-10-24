@@ -6,6 +6,8 @@
  */
 #include "change_list.h"
 
+#include <utility>
+
 #include "p4_api.h"
 #include "describe_result.h"
 #include "filelog_result.h"
@@ -13,12 +15,10 @@
 #include "utils/std_helpers.h"
 #include "minitrace.h"
 
-#include "thread_pool.h"
-
-ChangeList::ChangeList(const std::string& clNumber, const std::string& clDescription, const std::string& userID, const int64_t& clTimestamp)
-    : number(clNumber)
-    , user(userID)
-    , description(clDescription)
+ChangeList::ChangeList(std::string  clNumber, std::string  clDescription, std::string  userID, const int64_t& clTimestamp)
+    : number(std::move(clNumber))
+    , user(std::move(userID))
+    , description(std::move(clDescription))
     , timestamp(clTimestamp)
     , changedFileGroups(ChangedFileGroups::Empty())
 {
@@ -26,7 +26,7 @@ ChangeList::ChangeList(const std::string& clNumber, const std::string& clDescrip
 
 void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 {
-	MTR_SCOPE("ChangeList", __func__);
+	MTR_SCOPE("ChangeList", __func__)
 
 	if (branchSet.HasMergeableBranch())
 	{
@@ -39,7 +39,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 		const FileLogResult& filelog = p4->FileLog(number);
 		if (filelog.HasError())
 		{
-			throw filelog.PrintError();
+			throw std::runtime_error(filelog.PrintError());
 		}
 		changedFileGroups = branchSet.ParseAffectedFiles(filelog.GetFileData());
 	}
@@ -49,13 +49,12 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 		const DescribeResult& describe = p4->Describe(number);
 		if (describe.HasError())
 		{
-			ERR("Failed to describe changelist: " << describe.PrintError());
-			throw describe.PrintError();
+			ERR("Failed to describe changelist: " << describe.PrintError())
+			throw std::runtime_error(describe.PrintError());
 		}
 		changedFileGroups = branchSet.ParseAffectedFiles(describe.GetFileData());
 	}
 
-	*filesDownloaded = 0;
 	{
 		std::unique_lock<std::mutex> lock(*downloadPreparedMutex);
 		*downloadPrepared = true;
@@ -63,9 +62,9 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 	}
 }
 
-void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch)
+void ChangeList::StartDownload(P4API* p4, const int& printBatch)
 {
-	MTR_SCOPE("ChangeList", __func__);
+	MTR_SCOPE("ChangeList", __func__)
 
 	// wait for prepare to be finished.
 
@@ -75,7 +74,6 @@ void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int&
 		    { return downloadPrepared->load(); });
 	}
 
-	std::shared_ptr<std::vector<std::string>> printBatchFiles = std::make_shared<std::vector<std::string>>();
 	std::shared_ptr<std::vector<FileData*>> printBatchFileData = std::make_shared<std::vector<FileData*>>();
 	// Only perform the group inspection if there are files.
 	if (changedFileGroups->totalFileCount > 0)
@@ -88,16 +86,14 @@ void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int&
 				if (fileData.IsDownloadNeeded())
 				{
 					fileData.SetPendingDownload();
-					printBatchFiles->push_back(fileData.GetDepotFile() + "#" + fileData.GetRevision());
 					printBatchFileData->push_back(&fileData);
 
 					// Clear the batches if it fits
-					if (printBatchFiles->size() == printBatch)
+					if (printBatchFileData->size() == printBatch)
 					{
-						Flush(p4, printBatchFiles, printBatchFileData);
+						Flush(p4, printBatchFileData);
 
 						// We let go of the refs held by us and create new ones to queue the next batch
-						printBatchFiles = std::make_shared<std::vector<std::string>>();
 						printBatchFileData = std::make_shared<std::vector<FileData*>>();
 						// Now only the thread job has access to the older batch
 					}
@@ -108,32 +104,50 @@ void ChangeList::StartDownload(P4API* p4, const BranchSet& branchSet, const int&
 
 	// Flush any remaining files that were smaller in number than the total batch size.
 	// Additionally, signal the batch processing end.
-	Flush(p4, printBatchFiles, printBatchFileData);
+	Flush(p4, printBatchFileData);
 	*downloadJobsCompleted = true;
 	commitCV->notify_all();
 }
 
-void ChangeList::Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData)
+void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData)
 {
-	// Only perform the batch processing when there are files to process.
-	if (!printBatchFileData->empty())
+	std::vector<std::string> fileRevisions;
+	for (auto fileData : *printBatchFileData)
 	{
-		const PrintResult& printData = p4->PrintFiles(*printBatchFiles);
-		if (printData.HasError())
-		{
-			throw printData.PrintError();
-		}
-
-		for (int i = 0; i < printBatchFiles->size(); i++)
-		{
-			printBatchFileData->at(i)->MoveContentsOnceFrom(printData.GetPrintData().at(i).contents);
-		}
-
-		(*filesDownloaded) += printBatchFiles->size();
+		fileRevisions.push_back(fileData->GetDepotFile() + "#" + fileData->GetRevision());
 	}
 
-	// Ensure the notify_all is called.
-	commitCV->notify_all();
+	// Only perform the batch processing when there are files to process.
+	if (fileRevisions.empty())
+	{
+		return;
+	}
+
+	long idx = -1;
+	bool flushed = true;
+	PrintResult printResp = p4->PrintFiles(fileRevisions, [&idx, &printBatchFileData, &flushed] {
+		    if (idx == -1)
+		    {
+			    idx++;
+			    printBatchFileData->at(idx)->StartWrite();
+			    flushed = false;
+			    return;
+		    }
+		    printBatchFileData->at(idx)->Finalize();
+		    idx++;
+		    printBatchFileData->at(idx)->StartWrite();
+		    flushed = false;
+	    }, [&idx,&printBatchFileData](const char* contents, int length) {
+		    printBatchFileData->at(idx)->Write(contents, length);
+	    });
+	if (printResp.HasError())
+	{
+		throw std::runtime_error(printResp.PrintError());
+	}
+	if (!flushed)
+	{
+		printBatchFileData->back()->Finalize();
+	}
 }
 
 void ChangeList::WaitForDownload()
@@ -150,7 +164,6 @@ void ChangeList::Clear()
 	description.clear();
 	changedFileGroups->Clear();
 
-	filesDownloaded.reset();
 	commitMutex.reset();
 	commitCV.reset();
 }

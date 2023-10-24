@@ -14,18 +14,6 @@
 #include "minitrace.h"
 #include "utils/std_helpers.h"
 
-#define GIT2(x)                                                                \
-	do                                                                         \
-	{                                                                          \
-		int error = x;                                                         \
-		if (error < 0)                                                         \
-		{                                                                      \
-			const git_error* e = git_error_last();                             \
-			ERR("GitAPI: " << error << ":" << e->klass << ": " << e->message); \
-			exit(error);                                                       \
-		}                                                                      \
-	} while (false)
-
 GitAPI::GitAPI(const bool fsyncEnable, const int tz)
     : timezoneMinutes(tz)
 {
@@ -276,7 +264,6 @@ std::string GitAPI::WriteChangelistBranch(
 
 	for (auto& file : files)
 	{
-		auto& contents = file.GetContents();
 		if (file.IsDeleted())
 		{
 			GIT2(git_index_remove_bypath(idx, file.GetRelativePath().c_str()));
@@ -286,16 +273,15 @@ std::string GitAPI::WriteChangelistBranch(
 			git_index_entry entry = {
 				.mode = GIT_FILEMODE_BLOB,
 				.path = file.GetRelativePath().c_str(),
-				// .file_size = contents.size(),
 			};
+
+			auto& blobOID = file.GetBlobOID();
+			GIT2(git_oid_fromstr(&entry.id, blobOID.c_str()));
+
 			if (file.IsExecutable())
 			{
 				entry.mode = GIT_FILEMODE_BLOB_EXECUTABLE; // 0100755
 			}
-
-			git_oid objId;
-			GIT2(git_blob_create_from_buffer(&objId, m_Repo, contents.data(), contents.size()));
-			GIT2(git_oid_cpy(&entry.id, &objId));
 
 			GIT2(git_index_add(idx, &entry));
 		}

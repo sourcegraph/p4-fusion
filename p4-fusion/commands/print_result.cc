@@ -6,15 +6,18 @@
  */
 #include "print_result.h"
 
+#include <utility>
+
+PrintResult::PrintResult(std::function<void()> stat, std::function<void(const char*, int)> out): onStat(std::move(stat)),onOutput(std::move(out)) {}
+
 void PrintResult::OutputStat(StrDict* varList)
 {
-	m_Data.push_back(PrintData {});
+	onStat();
 }
 
 void PrintResult::OutputText(const char* data, int length)
 {
-	std::vector<char>& fileContent = m_Data.back().contents;
-	fileContent.insert(fileContent.end(), data, data + length);
+	onOutput(data, length);
 }
 
 void PrintResult::OutputBinary(const char* data, int length)

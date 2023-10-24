@@ -24,7 +24,6 @@ struct ChangeList
 	int64_t timestamp = 0;
 	std::unique_ptr<ChangedFileGroups> changedFileGroups = ChangedFileGroups::Empty();
 
-	std::shared_ptr<std::atomic<int>> filesDownloaded = std::make_shared<std::atomic<int>>(-1);
 	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
 	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();
@@ -32,8 +31,8 @@ struct ChangeList
 	std::shared_ptr<std::mutex> downloadPreparedMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<std::condition_variable> downloadPreparedCV = std::make_shared<std::condition_variable>();
 
-	ChangeList(const std::string& number, const std::string& description, const std::string& user, const int64_t& timestamp);
-
+	ChangeList(std::string  number, std::string  description, std::string  user, const int64_t& timestamp);
+	ChangeList() = delete;
 	ChangeList(const ChangeList& other) = delete;
 	ChangeList& operator=(const ChangeList&) = delete;
 	ChangeList(ChangeList&&) = default;
@@ -41,10 +40,10 @@ struct ChangeList
 	~ChangeList() = default;
 
 	void PrepareDownload(P4API* p4, const BranchSet& branchSet);
-	void StartDownload(P4API* p4, const BranchSet& branchSet, const int& printBatch);
+	void StartDownload(P4API* p4, const int& printBatch);
 	void WaitForDownload();
 	void Clear();
 
 private:
-	void Flush(P4API* p4, std::shared_ptr<std::vector<std::string>> printBatchFiles, std::shared_ptr<std::vector<FileData*>> printBatchFileData);
+	static void Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData);
 };

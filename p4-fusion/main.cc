@@ -50,6 +50,7 @@ int Main(int argc, char** argv)
 	const bool noMerge = arguments.GetNoMerge();
 	const std::string depotPath = arguments.GetDepotPath();
 	const std::string srcPath = arguments.GetSourcePath();
+	FileData::repoPath = srcPath;
 	const bool fsyncEnable = arguments.GetFsyncEnable();
 	const bool includeBinaries = arguments.GetIncludeBinaries();
 	const int maxChanges = arguments.GetMaxChanges();
@@ -190,13 +191,17 @@ int Main(int argc, char** argv)
 
 	// Request changelists.
 	PRINT("Requesting changelists to convert from the Perforce server");
-	ChangesResult changesRes = p4.Changes(depotPath, resumeFromCL, maxChanges);
-	if (changesRes.HasError())
+	std::vector<ChangeList> changes;
 	{
-		ERR("Failed to list changes: " << changesRes.PrintError());
-		return 1;
+		ChangesResult changesRes = p4.Changes(depotPath, resumeFromCL, maxChanges);
+		if (changesRes.HasError())
+		{
+			ERR("Failed to list changes: " << changesRes.PrintError());
+			return 1;
+		}
+		changes = std::move(changesRes.GetChanges());
 	}
-	std::vector<ChangeList> changes = std::move(changesRes.GetChanges());
+
 	// Return early if we have no work to do
 	if (changes.empty())
 	{
@@ -227,7 +232,7 @@ int Main(int argc, char** argv)
 	// Go in the chronological order.
 	std::atomic<int> downloaded;
 	downloaded.store(0);
-	int startupDownloadsCount = lookAhead;
+	size_t startupDownloadsCount = lookAhead;
 	if (lookAhead > changes.size())
 	{
 		startupDownloadsCount = changes.size();
@@ -245,9 +250,9 @@ int Main(int argc, char** argv)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API* p4)
+		pool.AddJob([&downloaded, &cl, printBatch](P4API* p4)
 		    {
-			cl.StartDownload(p4, branchSet, printBatch);
+			cl.StartDownload(p4, printBatch);
 			// Mark download as done.
 			downloaded++; });
 	}
@@ -323,7 +328,7 @@ int Main(int argc, char** argv)
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API* p4)
 			    {
 				downloadCL.PrepareDownload(p4, branchSet);
-				downloadCL.StartDownload(p4, branchSet, printBatch);
+				downloadCL.StartDownload(p4, printBatch);
 				// Mark download as done.
 				downloaded++; });
 		}

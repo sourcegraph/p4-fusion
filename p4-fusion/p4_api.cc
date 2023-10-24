@@ -213,16 +213,95 @@ FileLogResult P4API::FileLog(const std::string& changelist)
 	                                     });
 }
 
-PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions)
+PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, std::function<void()> onStat, std::function<void(const char*, int)> onOutput)
 {
-	MTR_SCOPE("P4", __func__);
+	MTR_SCOPE("P4", __func__)
 
 	if (fileRevisions.empty())
 	{
-		return PrintResult();
+		return {onStat,onOutput};
 	}
 
-	return Run<PrintResult>("print", fileRevisions);
+	std::string argsString;
+	for (const std::string& stringArg : fileRevisions)
+	{
+		argsString += " " + stringArg;
+	}
+
+	std::vector<char*> argsCharArray;
+	for (const std::string& arg : fileRevisions)
+	{
+		argsCharArray.push_back((char*)arg.c_str());
+	}
+
+	PrintResult clientUser(onStat,onOutput);
+
+	m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
+	m_ClientAPI.Run("print", &clientUser);
+
+	int retries = CommandRetries;
+	while (m_ClientAPI.Dropped() || clientUser.GetError().IsError())
+	{
+		if (retries == 0)
+		{
+			break;
+		}
+
+		ERR("Connection dropped or command errored, retrying in 5 seconds.");
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+
+		if (Reinitialize())
+		{
+			SUCCESS("Reinitialized P4API");
+		}
+		else
+		{
+			ERR("Could not reinitialize P4API");
+		}
+
+		WARN("Retrying: p4 print" << argsString);
+
+		clientUser = PrintResult(onStat,onOutput);
+
+		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
+		m_ClientAPI.Run("print", &clientUser);
+
+		retries--;
+	}
+
+	if (m_ClientAPI.Dropped() || clientUser.GetError().IsFatal())
+	{
+		ERR("Exiting due to receiving errors even after retrying " << CommandRetries << " times");
+		Deinitialize();
+		std::exit(1);
+	}
+
+	m_Usage++;
+	if (m_Usage > CommandRefreshThreshold)
+	{
+		int refreshRetries = CommandRetries;
+		while (refreshRetries > 0)
+		{
+			WARN("Trying to refresh the connection due to age (" << m_Usage << " > " << CommandRefreshThreshold << ").");
+			if (Reinitialize())
+			{
+				SUCCESS("Connection was refreshed");
+				break;
+			}
+			ERR("Could not refresh connection due to old age. Retrying in 5 seconds");
+			std::this_thread::sleep_for(std::chrono::seconds(5));
+
+			refreshRetries--;
+		}
+
+		if (refreshRetries == 0)
+		{
+			ERR("Could not refresh the connection after " << CommandRetries << " retries. Exiting.");
+			std::exit(1);
+		}
+	}
+
+	return clientUser;
 }
 
 UsersResult P4API::Users()
