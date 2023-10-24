@@ -7,7 +7,7 @@
 #pragma once
 
 #include <vector>
-
+#include <functional>
 #include "common.h"
 #include "result.h"
 
@@ -16,6 +16,7 @@ class PrintResult : public Result
 private:
 	std::function<void()> onStat;
 	std::function<void(const char*, int)> onOutput;
+
 public:
 	PrintResult() = delete;
 	PrintResult(std::function<void()> onStat, std::function<void(const char*, int)> onOutput);
