@@ -26,7 +26,7 @@
 
 #define P4_FUSION_VERSION "v1.13.1-sg"
 
-void SignalHandler(sig_atomic_t s);
+void printSignalSet(const std::string& prefix, const sigset_t& sigset);
 
 int Main(int argc, char** argv)
 {
@@ -63,9 +63,25 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	// Set the signal here because it gets reset after P4API library is initialized.
-	std::signal(SIGINT, SignalHandler);
-	std::signal(SIGTERM, SignalHandler);
+	volatile std::atomic_bool shutdownCalled;
+	shutdownCalled = false;
+
+	auto f = void(int signal)
+	{
+		shutdownCalled = true;
+	};
+
+	std::signal(SIGINT, f);
+
+	// First: block SIGINT, SIGTERM, and SIGUSR1 handlers
+	sigset_t blockedSignalSet;
+	sigemptyset(&blockedSignalSet);
+	sigaddset(&blockedSignalSet, SIGINT);
+	sigaddset(&blockedSignalSet, SIGTERM);
+	sigaddset(&blockedSignalSet, SIGUSR1);
+
+	pthread_sigmask(SIG_BLOCK, &blockedSignalSet, nullptr);
+	printSignalSet("blocked", blockedSignalSet);
 
 	P4API::P4PORT = arguments.GetPort();
 	P4API::P4USER = arguments.GetUsername();
@@ -209,23 +225,58 @@ int Main(int argc, char** argv)
 	ThreadPool pool(networkThreads);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
 
-	auto t = std::thread([&pool]()
+	auto signal_handler_thread = std::thread([&blockedSignalSet, &pool]()
 	    {
-			// See if the threadpool encountered any exceptions.
-			try
-			{
-				pool.RaiseCaughtExceptions();
-			}
-			catch (const std::exception& e)
-			{
-				// This is unrecoverable
-				ERR("Threadpool encountered an exception: " << e.what());
-				pool.ShutDown();
-				std::exit(1);
-			} });
+		int sig = 0;
+		sigset_t oldSignalSet;
+
+		int rc;
+		rc = pthread_sigmask(SIG_BLOCK, nullptr, &oldSignalSet);
+		if (rc != 0)
+		{
+			ERR("received err #" << rc << "when establishing signal mask");
+			std::exit(rc);
+		};
+
+		printSignalSet("old", oldSignalSet);
+		printSignalSet("blocked", blockedSignalSet);
+
+		sigwait(&blockedSignalSet, &sig);
+
+		ERR("Signal Received: " << strsignal(sig));
+
+		if (sig == SIGUSR1)
+		{
+			ERR("received shutdown signal from main thread") // gracefully shutdown
+			return;
+		}
+
+		ERR("Signal Received: " << strsignal(sig));
+
+		// TODO: Propagate cancel signal to main function.
+		pool.ShutDown();
+
+		std::exit(sig); });
+
+	auto t
+	    = std::thread([&pool]()
+	        {
+		// See if the threadpool encountered any exceptions.
+		try
+		{
+			pool.RaiseCaughtExceptions();
+		}
+		catch (const std::exception& e)
+		{
+			// This is unrecoverable
+			ERR("Threadpool encountered an exception: " << e.what());
+			pool.ShutDown();
+			std::exit(1);
+		} });
 
 	// Go in the chronological order.
-	std::atomic<int> downloaded;
+	std::atomic<int>
+	    downloaded;
 	downloaded.store(0);
 	int startupDownloadsCount = lookAhead;
 	if (lookAhead > changes.size())
@@ -339,6 +390,9 @@ int Main(int argc, char** argv)
 
 	pool.ShutDown();
 
+	pthread_kill(signal_handler_thread.native_handle(), SIGUSR1);
+	signal_handler_thread.join();
+
 	// Wait for exception handler to finish.
 	t.join();
 
@@ -354,22 +408,42 @@ int Main(int argc, char** argv)
 	return 0;
 }
 
-void SignalHandler(sig_atomic_t s)
+// void SignalHandler(sig_atomic_t s)
+//{
+//	static bool called = false;
+//	if (called)
+//	{
+//		WARN("Already received an interrupt signal, waiting for threads to shutdown.");
+//		return;
+//	}
+//	called = true;
+//
+//	ERR("Signal Received: " << strsignal(s));
+//
+//	// TODO: Propagate cancel signal to main function.
+//	pool.ShutDown();
+//
+//	std::exit(s);
+// }
+
+void printSignalSet(const std::string& prefix, const sigset_t& sigset)
 {
-	static bool called = false;
-	if (called)
+	int sig, cnt;
+
+	cnt = 0;
+	for (sig = 1; sig < NSIG; sig++)
 	{
-		WARN("Already received an interrupt signal, waiting for threads to shutdown.");
-		return;
+		if (sigismember(&sigset, sig))
+		{
+			cnt++;
+			PRINT(prefix << ": " << sig << " " << strsignal(sig));
+		}
 	}
-	called = true;
 
-	ERR("Signal Received: " << strsignal(s));
-
-	// TODO: Propagate cancel signal to main function.
-	// pool.ShutDown();
-
-	std::exit(s);
+	if (cnt == 0)
+	{
+		PRINT(prefix << ": empty signal set")
+	}
 }
 
 int main(int argc, char** argv)
