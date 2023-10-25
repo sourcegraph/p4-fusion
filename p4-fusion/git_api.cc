@@ -9,9 +9,20 @@
 #include <cstdlib>
 
 #include "git2.h"
-#include "git2/sys/repository.h"
 #include "minitrace.h"
 #include "utils/std_helpers.h"
+
+#define GIT2(x)                                                                \
+	do                                                                         \
+	{                                                                          \
+		int error = x;                                                         \
+		if (error < 0)                                                         \
+		{                                                                      \
+			const git_error* e = git_error_last();                             \
+			ERR("GitAPI: " << error << ":" << e->klass << ": " << e->message); \
+			exit(error);                                                       \
+		}                                                                      \
+	} while (false)
 
 GitAPI::GitAPI(const std::string& _repoPath, const bool fsyncEnable, const int tz)
     : timezoneMinutes(tz)

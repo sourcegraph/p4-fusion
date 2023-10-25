@@ -16,18 +16,6 @@
 #include "commands/change_list.h"
 #include "git2/oid.h"
 
-#define GIT2(x)                                                                \
-	do                                                                         \
-	{                                                                          \
-		int error = x;                                                         \
-		if (error < 0)                                                         \
-		{                                                                      \
-			const git_error* e = git_error_last();                             \
-			ERR("GitAPI: " << error << ":" << e->klass << ": " << e->message); \
-			exit(error);                                                       \
-		}                                                                      \
-	} while (false)
-
 struct git_repository;
 
 class BlobWriter
