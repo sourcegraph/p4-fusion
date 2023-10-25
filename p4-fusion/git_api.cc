@@ -13,8 +13,9 @@
 #include "minitrace.h"
 #include "utils/std_helpers.h"
 
-GitAPI::GitAPI(const bool fsyncEnable, const int tz)
+GitAPI::GitAPI(const std::string& _repoPath, const bool fsyncEnable, const int tz)
     : timezoneMinutes(tz)
+    , repoPath(_repoPath)
 {
 	git_libgit2_init();
 	GIT2(git_libgit2_opts(GIT_OPT_ENABLE_FSYNC_GITDIR, (int)fsyncEnable));
@@ -50,20 +51,25 @@ bool GitAPI::IsRepositoryClonedFrom(const std::string& depotPath) const
 	return repoDepotPath == depotPath;
 }
 
-bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreateBaseCommit)
+void GitAPI::OpenRepository()
 {
-	if (git_repository_open_bare(&m_Repo, srcPath.c_str()) < 0)
+	GIT2(git_repository_open_bare(&m_Repo, repoPath.c_str()));
+}
+
+void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
+{
+	if (git_repository_open_bare(&m_Repo, repoPath.c_str()) < 0)
 	{
 		git_repository_init_options opts = GIT_REPOSITORY_INIT_OPTIONS_INIT;
 		opts.flags = GIT_REPOSITORY_INIT_MKPATH | GIT_REPOSITORY_INIT_BARE;
 		opts.initial_head = "main";
 
-		GIT2(git_repository_init_ext(&m_Repo, srcPath.c_str(), &opts));
-		SUCCESS("Initialized Git repository at " << srcPath)
+		GIT2(git_repository_init_ext(&m_Repo, repoPath.c_str(), &opts));
+		SUCCESS("Initialized Git repository at " << repoPath)
 	}
 	else
 	{
-		SUCCESS("Opened existing Git repository at " << srcPath)
+		SUCCESS("Opened existing Git repository at " << repoPath)
 	}
 
 	// Now that we have a bare repo (potentially empty), we can go ahead and determine
@@ -75,9 +81,9 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 
 		// Walk the graph to find the root commit of the HEAD branch.
 		git_revwalk* walk;
-		git_revwalk_new(&walk, m_Repo);
-		git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL);
-		git_revwalk_push_head(walk);
+		GIT2(git_revwalk_new(&walk, m_Repo));
+		GIT2(git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL));
+		GIT2(git_revwalk_push_head(walk));
 		while (git_revwalk_next(&m_FirstCommitOid, walk) != GIT_ITEROVER)
 		{
 		}
@@ -117,8 +123,6 @@ bool GitAPI::InitializeRepository(const std::string& srcPath, const bool noCreat
 		// This empty oid will pass the git_oid_is_zero check.
 		m_FirstCommitOid = git_oid {};
 	}
-
-	return true;
 }
 
 bool GitAPI::IsHEADExists() const
@@ -359,4 +363,55 @@ std::string GitAPI::WriteChangelistBranch(
 	git_index_free(idx);
 
 	return commitSHA;
+}
+
+BlobWriter::BlobWriter(git_repository* gitRepo)
+    : repo(gitRepo)
+    , writer(nullptr)
+    , begun(false)
+    , finalized(false)
+{
+}
+
+BlobWriter* GitAPI::WriteBlob() const
+{
+	return new BlobWriter(m_Repo);
+}
+
+void BlobWriter::Write(const char* contents, int length)
+{
+	MTR_SCOPE("BlobWriter", __func__);
+
+	if (finalized)
+	{
+		throw std::runtime_error("Called BlobWriter::Write after Close");
+	}
+
+	if (!begun)
+	{
+		GIT2(git_blob_create_from_stream(&writer, repo, nullptr));
+		begun = true;
+	}
+	GIT2(writer->write(writer, contents, length));
+}
+
+std::string BlobWriter::Close()
+{
+	MTR_SCOPE("BlobWriter", __func__);
+
+	if (!begun)
+	{
+		// If nothing was written yet, it's most likely an empty file is written, so
+		// create a new stream and commit it right away.
+		Write("", 0);
+	}
+
+	if (finalized)
+	{
+		throw std::runtime_error("Called BlobWriter::Close again");
+	}
+
+	git_oid objId;
+	GIT2(git_blob_create_from_stream_commit(&objId, writer));
+	return git_oid_tostr_s(&objId);
 }

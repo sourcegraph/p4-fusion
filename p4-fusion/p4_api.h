@@ -34,9 +34,9 @@ class P4API
 	bool CheckErrors(Error& e, StrBuf& msg);
 
 	template <class T>
-	T Run(const char* command, const std::vector<std::string>& stringArguments);
+	T Run(const char* command, const std::vector<std::string>& stringArguments, const std::function<T()>& creatorFunc);
 	template <class T>
-	T RunEx(const char* command, const std::vector<std::string>& stringArguments, int commandRetries);
+	T RunEx(const char* command, const std::vector<std::string>& stringArguments, int commandRetries, const std::function<T()>& creatorFunc);
 	void AddClientSpecView(const std::vector<std::string>& viewStrings);
 
 public:
@@ -61,8 +61,8 @@ public:
 
 	TestResult TestConnection(int retries);
 	ChangesResult Changes(const std::string& path, const std::string& from, int32_t maxCount);
-	DescribeResult Describe(const int cl);
-	FileLogResult FileLog(const int changelist);
+	DescribeResult Describe(GitAPI& git, int cl);
+	FileLogResult FileLog(GitAPI& git, const int changelist);
 	PrintResult PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput);
 	ClientResult Client();
 	UsersResult Users();
@@ -70,7 +70,7 @@ public:
 };
 
 template <class T>
-inline T P4API::RunEx(const char* command, const std::vector<std::string>& stringArguments, const int commandRetries)
+inline T P4API::RunEx(const char* command, const std::vector<std::string>& stringArguments, const int commandRetries, const std::function<T()>& creatorFunc)
 {
 	std::string argsString;
 	for (const std::string& stringArg : stringArguments)
@@ -85,7 +85,7 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 		argsCharArray.push_back((char*)arg.c_str());
 	}
 
-	T clientUser;
+	T clientUser = creatorFunc();
 
 	m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
 	m_ClientAPI.Run(command, &clientUser);
@@ -112,7 +112,7 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 
 		WARN("Retrying: p4 " << command << argsString)
 
-		clientUser = T();
+		clientUser = creatorFunc();
 
 		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
 		m_ClientAPI.Run(command, &clientUser);
@@ -156,7 +156,7 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 }
 
 template <class T>
-inline T P4API::Run(const char* command, const std::vector<std::string>& stringArguments)
+inline T P4API::Run(const char* command, const std::vector<std::string>& stringArguments, const std::function<T()>& creatorFunc)
 {
-	return RunEx<T>(command, stringArguments, CommandRetries);
+	return RunEx<T>(command, stringArguments, CommandRetries, creatorFunc);
 }

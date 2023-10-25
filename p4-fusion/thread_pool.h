@@ -14,22 +14,15 @@
 
 #include "common.h"
 #include "p4_api.h"
+#include "git_api.h"
 
 class P4API;
 
-class Thread
-{
-public:
-	std::thread m_T;
-	P4API m_P4;
-	const std::string m_Name;
-};
-
-typedef std::function<void(P4API*)> Job;
+typedef std::function<void(P4API&, GitAPI&)> Job;
 
 class ThreadPool
 {
-	std::vector<Thread> m_Threads;
+	std::vector<std::thread> m_Threads;
 	std::mutex m_ThreadExceptionsMutex;
 	std::condition_variable m_ThreadExceptionCV;
 	std::deque<std::exception_ptr> m_ThreadExceptions;
@@ -43,7 +36,7 @@ class ThreadPool
 	std::atomic<bool> m_HasShutDownBeenCalled;
 
 public:
-	ThreadPool(int size);
+	ThreadPool(int size, const std::string& repoPath, bool fsyncEnable, int tz);
 	ThreadPool() = delete;
 	~ThreadPool();
 

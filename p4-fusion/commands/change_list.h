@@ -15,6 +15,7 @@
 #include "../branch_set.h"
 
 class P4API;
+class GitAPI;
 
 struct ChangeList
 {
@@ -24,7 +25,7 @@ struct ChangeList
 	int64_t timestamp = 0;
 	std::unique_ptr<ChangedFileGroups> changedFileGroups = ChangedFileGroups::Empty();
 
-	ChangeList(const int& number, std::string description, std::string user, const int64_t& timestamp);
+	ChangeList(const int& clNumber, std::string clDescription, std::string userID, const int64_t& clTimestamp);
 	ChangeList() = delete;
 	ChangeList(const ChangeList& other) = delete;
 	ChangeList& operator=(const ChangeList&) = delete;
@@ -32,13 +33,13 @@ struct ChangeList
 	ChangeList& operator=(ChangeList&&) = default;
 	~ChangeList() = default;
 
-	void PrepareDownload(P4API* p4, const BranchSet& branchSet);
-	void StartDownload(P4API* p4, const int& printBatch);
+	void PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branchSet);
+	void StartDownload(P4API& p4, const int& printBatch);
 	void WaitForDownload();
 	void Clear();
 
 private:
-	static void Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData);
+	static void Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData);
 	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
 	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();

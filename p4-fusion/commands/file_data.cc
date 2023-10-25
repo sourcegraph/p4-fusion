@@ -6,20 +6,20 @@
  */
 #include "file_data.h"
 #include "git_api.h"
-#include "git2.h"
-#include "minitrace.h"
-
-std::string FileData::repoPath;
 
 FileDataStore::FileDataStore()
     : actionCategory(FileAction::FileAdd)
     , isBlobOIDSet(false)
     , isContentsPendingDownload(false)
+    , isBinary(false)
+    , isExecutable(false)
 {
 }
 
-FileData::FileData(std::string& depotFile, std::string& revision, std::string& action, std::string& type)
+FileData::FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type)
     : m_data(std::make_shared<FileDataStore>())
+    , m_Git(git)
+    , writer(nullptr)
 {
 	m_data->depotFile = depotFile;
 	m_data->revision = revision;
@@ -30,8 +30,15 @@ FileData::FileData(std::string& depotFile, std::string& revision, std::string& a
 	m_data->isContentsPendingDownload = false;
 }
 
+FileData::~FileData()
+{
+	free(writer);
+}
+
 FileData::FileData(const FileData& copy)
     : m_data(copy.m_data)
+    , m_Git(copy.m_Git)
+    , writer(nullptr)
 {
 }
 
@@ -43,6 +50,7 @@ FileData& FileData::operator=(FileData& other)
 		return *this;
 	}
 	m_data = other.m_data;
+	m_Git = other.m_Git;
 	return *this;
 }
 
@@ -61,8 +69,6 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 
 void FileData::StartWrite()
 {
-	MTR_SCOPE("FileData", __func__);
-
 	if (m_data->isBlobOIDSet)
 	{
 		// Do not set the contents.  Assume that
@@ -70,25 +76,19 @@ void FileData::StartWrite()
 		return;
 	}
 
-	GIT2(git_repository_open_bare(&repo, FileData::repoPath.c_str()));
-	GIT2(git_blob_create_from_stream(&writer, repo, nullptr));
+	writer = m_Git.WriteBlob();
 }
 
 void FileData::Write(const char* contents, int length)
 {
-	MTR_SCOPE("FileData", __func__);
-
-	GIT2(writer->write(writer, contents, length));
+	writer->Write(contents, length);
 }
 
 void FileData::Finalize()
 {
-	MTR_SCOPE("FileData", __func__);
-	
-	git_oid objId;
-	GIT2(git_blob_create_from_stream_commit(&objId, writer));
-	m_data->blobOID = git_oid_tostr_s(&objId);
-	git_repository_free(repo);
+	m_data->blobOID = writer->Close();
+	free(writer);
+	writer = nullptr;
 	m_data->isBlobOIDSet = true;
 	m_data->isContentsPendingDownload = false;
 }

@@ -23,7 +23,7 @@
 #include "p4/p4libs.h"
 #include "minitrace.h"
 
-#define P4_FUSION_VERSION "v1.13.1-sg"
+#define P4_FUSION_VERSION "v1.13.2-sg"
 
 void SignalHandler(sig_atomic_t s);
 
@@ -49,7 +49,6 @@ int Main(int argc, char** argv)
 	const bool noMerge = arguments.GetNoMerge();
 	const std::string depotPath = arguments.GetDepotPath();
 	const std::string srcPath = arguments.GetSourcePath();
-	FileData::repoPath = srcPath;
 	const bool fsyncEnable = arguments.GetFsyncEnable();
 	const bool includeBinaries = arguments.GetIncludeBinaries();
 	const int maxChanges = arguments.GetMaxChanges();
@@ -156,13 +155,10 @@ int Main(int argc, char** argv)
 	PRINT("No Colored Output: " << noColor)
 	PRINT("Inspecting " << branchSet.Count() << " branches")
 
-	GitAPI git(fsyncEnable, timezoneMinutes);
+	GitAPI git(srcPath, fsyncEnable, timezoneMinutes);
 
-	if (!git.InitializeRepository(srcPath, arguments.GetNoBaseCommit()))
-	{
-		ERR("Could not initialize Git repository. Exiting.")
-		return 1;
-	}
+	// This throws on error.
+	git.InitializeRepository(arguments.GetNoBaseCommit());
 
 	// Setup trace file generation. This HAS to happen after initializing the
 	// repository, only then the tracePath will be ensured to exist.
@@ -217,7 +213,7 @@ int Main(int argc, char** argv)
 	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number)
 
 	PRINT("Creating " << networkThreads << " network threads")
-	ThreadPool pool(networkThreads);
+	ThreadPool pool(networkThreads, srcPath, fsyncEnable, timezoneMinutes);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
 
 	auto t = std::thread([&pool]()
@@ -249,15 +245,15 @@ int Main(int argc, char** argv)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		pool.AddJob([&cl, &branchSet](P4API* p4)
-		    { cl.PrepareDownload(p4, branchSet); });
+		pool.AddJob([&cl, &branchSet](P4API& p4, GitAPI& git)
+		    { cl.PrepareDownload(p4, git, branchSet); });
 	}
 
 	for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API* p4)
+		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
 		    {
 			cl.StartDownload(p4, printBatch);
 			// Mark download as done.
@@ -332,9 +328,9 @@ int Main(int argc, char** argv)
 		if (next < changes.size())
 		{
 			ChangeList& downloadCL = changes.at(next);
-			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API* p4)
+			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
 			    {
-				downloadCL.PrepareDownload(p4, branchSet);
+				downloadCL.PrepareDownload(p4, git,branchSet);
 				downloadCL.StartDownload(p4, printBatch);
 				// Mark download as done.
 				downloaded++; });

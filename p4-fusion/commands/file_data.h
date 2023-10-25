@@ -10,7 +10,9 @@
 #include <atomic>
 #include "common.h"
 #include "utils/std_helpers.h"
-#include "git2.h"
+
+class GitAPI;
+class BlobWriter;
 
 #define FAKE_INTEGRATION_DELETE_ACTION_NAME "FAKE merge delete"
 
@@ -68,13 +70,13 @@ struct FileData
 {
 private:
 	std::shared_ptr<FileDataStore> m_data;
-	git_repository* repo = nullptr;
-	git_writestream* writer = nullptr;
+	GitAPI& m_Git;
+	BlobWriter* writer;
 
 public:
-	static std::string repoPath;
 	FileData() = delete;
-	FileData(std::string& depotFile, std::string& revision, std::string& action, std::string& type);
+	~FileData();
+	FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type);
 	FileData(const FileData& copy);
 	FileData& operator=(FileData& other);
 

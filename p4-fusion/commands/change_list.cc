@@ -24,7 +24,7 @@ ChangeList::ChangeList(const int& clNumber, std::string clDescription, std::stri
 {
 }
 
-void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
+void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branchSet)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -36,7 +36,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 		// copy will have the target files listing the from-file with
 		// different changelists than the point-in-time source branch's
 		// changelist.
-		const FileLogResult& filelog = p4->FileLog(number);
+		const FileLogResult& filelog = p4.FileLog(git, number);
 		if (filelog.HasError())
 		{
 			throw std::runtime_error(filelog.PrintError());
@@ -46,7 +46,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 	else
 	{
 		// If we don't care about branches, then p4->Describe is much faster.
-		const DescribeResult& describe = p4->Describe(number);
+		const DescribeResult& describe = p4.Describe(git, number);
 		if (describe.HasError())
 		{
 			ERR("Failed to describe changelist: " << describe.PrintError())
@@ -62,7 +62,7 @@ void ChangeList::PrepareDownload(P4API* p4, const BranchSet& branchSet)
 	}
 }
 
-void ChangeList::StartDownload(P4API* p4, const int& printBatch)
+void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -109,7 +109,7 @@ void ChangeList::StartDownload(P4API* p4, const int& printBatch)
 	commitCV->notify_all();
 }
 
-void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData)
+void ChangeList::Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -127,7 +127,7 @@ void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>&
 
 	long idx = -1;
 	bool flushed = true;
-	PrintResult printResp = p4->PrintFiles(
+	PrintResult printResp = p4.PrintFiles(
 	    fileRevisions, [&idx, &printBatchFileData, &flushed]
 	    {
 		    if (idx == -1)
@@ -158,7 +158,7 @@ void ChangeList::Flush(P4API* p4, const std::shared_ptr<std::vector<FileData*>>&
 void ChangeList::WaitForDownload()
 {
 	MTR_SCOPE("ChangeList", __func__);
-	
+
 	std::unique_lock<std::mutex> lock(*commitMutex);
 	commitCV->wait(lock, [this]()
 	    { return downloadJobsCompleted->load(); });

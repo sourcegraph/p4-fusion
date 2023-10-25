@@ -110,7 +110,7 @@ bool P4API::InitializeLibraries()
 		StrBuf msg;
 		e.Fmt(&msg);
 		ERR(msg.Text());
-		ERR("Failed to initialize P4Libraries");
+		ERR("Failed to initialize P4Libraries")
 		return false;
 	}
 
@@ -119,7 +119,7 @@ bool P4API::InitializeLibraries()
 	std::signal(SIGINT, SIG_DFL);
 	signaler.Disable();
 
-	SUCCESS("Initialized P4Libraries successfully");
+	SUCCESS("Initialized P4Libraries successfully")
 	return true;
 }
 
@@ -144,12 +144,14 @@ void P4API::AddClientSpecView(const std::vector<std::string>& viewStrings)
 
 ClientResult P4API::Client()
 {
-	return Run<ClientResult>("client", { "-o" });
+	return Run<ClientResult>("client", { "-o" }, []() -> ClientResult
+	    { return {}; });
 }
 
 TestResult P4API::TestConnection(const int retries)
 {
-	return RunEx<TestResult>("changes", { "-m", "1", "//..." }, retries);
+	return RunEx<TestResult>("changes", { "-m", "1", "//..." }, retries, []() -> TestResult
+	    { return {}; });
 }
 
 ChangesResult P4API::Changes(const std::string& path, const std::string& from, int32_t maxCount)
@@ -183,27 +185,32 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 
 	args.push_back(path + pathAddition);
 
-	ChangesResult result = Run<ChangesResult>("changes", args);
+	ChangesResult result = Run<ChangesResult>("changes", args, []() -> ChangesResult
+	    { return {}; });
 
 	return result;
 }
 
-DescribeResult P4API::Describe(const int cl)
+DescribeResult P4API::Describe(GitAPI& git, const int cl)
 {
 	MTR_SCOPE("P4", __func__);
 
 	return Run<DescribeResult>("describe", { "-s", // Omit the diffs
-	                                           std::to_string(cl) });
+	                                           std::to_string(cl) },
+	    [&git]() -> DescribeResult
+	    { return { git }; });
 }
 
-FileLogResult P4API::FileLog(const int changelist)
+FileLogResult P4API::FileLog(GitAPI& git, const int changelist)
 {
 	return Run<FileLogResult>("filelog", {
 	                                         "-c", // restrict output to a single changelist
 	                                         std::to_string(changelist),
 	                                         "-m1", // don't get the full history, just the first entry.
 	                                         "//..." // rather than require the path to be passed in, just list all files.
-	                                     });
+	                                     },
+	    [&git]() -> FileLogResult
+	    { return { git }; });
 }
 
 PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput)
@@ -215,97 +222,21 @@ PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, con
 		return { onStat, onOutput };
 	}
 
-	std::string argsString;
-	for (const std::string& stringArg : fileRevisions)
-	{
-		argsString += " " + stringArg;
-	}
-
-	std::vector<char*> argsCharArray;
-	argsCharArray.reserve(fileRevisions.size());
-	for (const std::string& arg : fileRevisions)
-	{
-		argsCharArray.push_back((char*)arg.c_str());
-	}
-
-	PrintResult clientUser(onStat, onOutput);
-
-	m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
-	m_ClientAPI.Run("print", &clientUser);
-
-	int retries = CommandRetries;
-	while (m_ClientAPI.Dropped() || clientUser.GetError().IsError())
-	{
-		if (retries == 0)
-		{
-			break;
-		}
-
-		ERR("Connection dropped or command errored, retrying in 5 seconds.")
-		std::this_thread::sleep_for(std::chrono::seconds(5));
-
-		if (Reinitialize())
-		{
-			SUCCESS("Reinitialized P4API")
-		}
-		else
-		{
-			ERR("Could not reinitialize P4API")
-		}
-
-		WARN("Retrying: p4 print" << argsString)
-
-		clientUser = PrintResult(onStat, onOutput);
-
-		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
-		m_ClientAPI.Run("print", &clientUser);
-
-		retries--;
-	}
-
-	if (m_ClientAPI.Dropped() || clientUser.GetError().IsFatal())
-	{
-		ERR("Exiting due to receiving errors even after retrying " << CommandRetries << " times")
-		Deinitialize();
-		std::exit(1);
-	}
-
-	m_Usage++;
-	if (m_Usage > CommandRefreshThreshold)
-	{
-		int refreshRetries = CommandRetries;
-		while (refreshRetries > 0)
-		{
-			WARN("Trying to refresh the connection due to age (" << m_Usage << " > " << CommandRefreshThreshold << ").")
-			if (Reinitialize())
-			{
-				SUCCESS("Connection was refreshed")
-				break;
-			}
-			ERR("Could not refresh connection due to old age. Retrying in 5 seconds")
-			std::this_thread::sleep_for(std::chrono::seconds(5));
-
-			refreshRetries--;
-		}
-
-		if (refreshRetries == 0)
-		{
-			ERR("Could not refresh the connection after " << CommandRetries << " retries. Exiting.")
-			std::exit(1);
-		}
-	}
-
-	return clientUser;
+	return Run<PrintResult>("print", fileRevisions, [&onStat, &onOutput]() -> PrintResult
+	    { return { onStat, onOutput }; });
 }
 
 UsersResult P4API::Users()
 {
 	return Run<UsersResult>("users", {
 	                                     "-a" // Include service accounts
-	                                 });
+	                                 },
+	    []()
+	    { return UsersResult(); });
 }
 
 InfoResult P4API::Info()
 {
-	return Run<InfoResult>("info", {});
+	return Run<InfoResult>("info", {}, []()
+	    { return InfoResult(); });
 }

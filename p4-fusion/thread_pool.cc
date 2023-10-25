@@ -8,6 +8,7 @@
 #include "common.h"
 #include "p4_api.h"
 #include "minitrace.h"
+#include "git_api.h"
 
 void ThreadPool::AddJob(const Job& function)
 {
@@ -62,7 +63,7 @@ void ThreadPool::ShutDown()
 	// Wait for all worker threads to finish.
 	for (auto& thread : m_Threads)
 	{
-		thread.m_T.join();
+		thread.join();
 	}
 
 	m_Threads.clear();
@@ -75,20 +76,23 @@ void ThreadPool::ShutDown()
 	SUCCESS("Thread pool shut down successfully")
 }
 
-ThreadPool::ThreadPool(int size)
+ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool fsyncEnable, const int tz)
     : m_HasShutDownBeenCalled(false)
     , m_ShouldStop(false)
 {
-	// Initialize the thread handlers;
-	m_Threads.resize(size);
-
+	// Initialize size threads.
 	for (int i = 0; i < size; i++)
 	{
-		Thread& t = m_Threads[i];
-		t.m_T = std::thread([this, &t, &i]()
+		m_Threads.emplace_back([this, &i, &repoPath, &fsyncEnable, &tz]()
 		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
+
+			    // Initialize p4 API.
+			    P4API p4;
+			    GitAPI git(repoPath, fsyncEnable, tz);
+
+			    git.OpenRepository();
 
 				// Job queue, we keep looking for new jobs until the shutdown
 				// event.
@@ -112,7 +116,7 @@ ThreadPool::ThreadPool(int size)
 
 					try
 					{
-						job(&t.m_P4);
+						job(p4, git);
 					}
 					catch (const std::exception& e)
 					{

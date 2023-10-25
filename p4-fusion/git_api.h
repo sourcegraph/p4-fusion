@@ -29,18 +29,38 @@
 
 struct git_repository;
 
+class BlobWriter
+{
+private:
+	git_repository* repo;
+	git_writestream* writer;
+	bool begun;
+	bool finalized;
+
+public:
+	BlobWriter() = delete;
+	BlobWriter(git_repository* repo);
+
+	void Write(const char* contents, int length);
+	std::string Close();
+};
+
 class GitAPI
 {
 	git_repository* m_Repo = nullptr;
 	git_oid m_FirstCommitOid;
+	std::string repoPath;
 	int timezoneMinutes;
 
 public:
-	GitAPI(bool fsyncEnable, int timezoneMinutes);
+	GitAPI(const std::string& repoPath, bool fsyncEnable, int timezoneMinutes);
 	GitAPI() = delete;
 	~GitAPI();
 
-	bool InitializeRepository(const std::string& srcPath, bool noCreateBaseCommit);
+	BlobWriter* WriteBlob() const;
+
+	void InitializeRepository(bool noCreateBaseCommit);
+	void OpenRepository();
 	bool IsHEADExists() const;
 	bool IsRepositoryClonedFrom(const std::string& depotPath) const;
 	/* Checks if a previous commit was made and extracts the corresponding changelist number. */

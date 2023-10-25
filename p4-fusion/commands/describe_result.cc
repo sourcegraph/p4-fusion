@@ -5,6 +5,25 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include "describe_result.h"
+#include "git_api.h"
+
+DescribeResult::DescribeResult(GitAPI& git)
+    : m_Git(git)
+{
+}
+
+DescribeResult& DescribeResult::operator=(const DescribeResult& other)
+{
+	if (this == &other)
+	{
+		// guard...
+		return *this;
+	}
+
+	m_Git = other.m_Git;
+	m_FileData = other.m_FileData;
+	return *this;
+}
 
 void DescribeResult::OutputStat(StrDict* varList)
 {
@@ -25,7 +44,7 @@ int DescribeResult::OutputStatPartial(StrDict* varList)
 	std::string revision = varList->GetVar(("rev" + indexString).c_str())->Text();
 	std::string action = varList->GetVar(("action" + indexString).c_str())->Text();
 
-	m_FileData.emplace_back(depotFileStr, revision, action, type);
+	m_FileData.emplace_back(m_Git, depotFileStr, revision, action, type);
 
 	return 1;
 }
