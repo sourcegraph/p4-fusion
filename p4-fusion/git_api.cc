@@ -23,6 +23,13 @@ GitAPI::GitAPI(const std::string& _repoPath, const bool fsyncEnable, const int t
 
 GitAPI::~GitAPI()
 {
+	std::map<std::string, git_index*>::iterator it;
+	for (it = lastBranchTree.begin(); it != lastBranchTree.end(); it++)
+	{
+		git_index_free(it->second);
+	}
+	lastBranchTree.clear();
+
 	if (m_Repo)
 	{
 		git_repository_free(m_Repo);
@@ -181,90 +188,99 @@ std::string GitAPI::WriteChangelistBranch(
     const std::string& targetBranch,
     const std::string& authorName,
     const std::string& authorEmail,
-    const std::string& mergeFrom) const
+    const std::string& mergeFrom)
 {
 	MTR_SCOPE("Git", __func__);
 
 	std::string targetBranchRef = "HEAD";
 	git_index* idx;
 
-	if (!targetBranch.empty())
+	if (lastBranchTree.find(targetBranch) != lastBranchTree.end())
 	{
-		// targetBranchRef = "refs/heads/" + targetBranch;
-		// // Look up the branch.
-		// git_reference* branch;
-		// int errorCode = git_reference_lookup(&branch, m_Repo, targetBranchRef.c_str());
-		// if (errorCode != 0 && errorCode != GIT_ENOTFOUND)
-		// {
-		// 	// Unexpected error.
-		// 	GIT2(errorCode);
-		// }
-		// if (errorCode == GIT_ENOTFOUND)
-		// {
-		// 	// Ref doesn't exist yet, so we need to create a new branch. If the
-		// 	// no branch option is set, we create a new root commit, otherwise
-		// 	// we branch off of the known last commit.
-		// 	// If this is a new export, the last known commit is the empty commit
-		// 	// we create to have a common merge-base.
-		// 	// Otherwise, it is the commit HEAD was pointing at when the process
-		// 	// started.
-
-		// 	// Create the branch from the first index.
-		// 	git_commit* firstCommit = nullptr;
-		// 	// TODO: m_FirstCommitOid can be empty if we didn't create a base commit.
-		// 	// In that case, we should probably create a root commit?
-		// 	GIT2(git_commit_lookup(&firstCommit, m_Repo, &m_FirstCommitOid));
-		// 	GIT2(git_branch_create(&branch, m_Repo, branchName.c_str(), firstCommit, 0));
-		// 	git_commit_free(firstCommit);
-		// }
-
-		// targetBranchRef = git_reference_name(branch);
-
-		// // Make head point to the branch.
-		// git_reference* head;
-		// GIT2(git_reference_symbolic_create(&head, m_Repo, "HEAD", git_reference_name(branch), 1, branchName.c_str()));
-		// git_reference_free(head);
-		// git_reference_free(branch);
-
-		// // Now update the files in the index to match the content of the commit pointed at by HEAD.
-		// git_oid oidParentCommit;
-		// GIT2(git_reference_name_to_id(&oidParentCommit, m_Repo, "HEAD"));
-
-		// git_commit* headCommit = nullptr;
-		// GIT2(git_commit_lookup(&headCommit, m_Repo, &oidParentCommit));
-
-		// git_tree* headCommitTree = nullptr;
-		// GIT2(git_commit_tree(&headCommitTree, headCommit));
-
-		// GIT2(git_index_read_tree(m_Index, headCommitTree));
-
-		// git_tree_free(headCommitTree);
-		// git_commit_free(headCommit);
+		idx = lastBranchTree[targetBranch];
 	}
 	else
 	{
-		// Create a new in-memory index for current HEAD.
-		GIT2(git_index_new(&idx));
-		git_oid headCommitSHA;
-		int exitCode = git_reference_name_to_id(&headCommitSHA, m_Repo, "HEAD");
-		if (exitCode != 0 && exitCode != GIT_ENOTFOUND)
+		// Branch not seen yet, we need to load the index into memory.
+		if (!targetBranch.empty())
 		{
-			GIT2(exitCode);
+			// targetBranchRef = "refs/heads/" + targetBranch;
+			// // Look up the branch.
+			// git_reference* branch;
+			// int errorCode = git_reference_lookup(&branch, m_Repo, targetBranchRef.c_str());
+			// if (errorCode != 0 && errorCode != GIT_ENOTFOUND)
+			// {
+			// 	// Unexpected error.
+			// 	GIT2(errorCode);
+			// }
+			// if (errorCode == GIT_ENOTFOUND)
+			// {
+			// 	// Ref doesn't exist yet, so we need to create a new branch. If the
+			// 	// no branch option is set, we create a new root commit, otherwise
+			// 	// we branch off of the known last commit.
+			// 	// If this is a new export, the last known commit is the empty commit
+			// 	// we create to have a common merge-base.
+			// 	// Otherwise, it is the commit HEAD was pointing at when the process
+			// 	// started.
+
+			// 	// Create the branch from the first index.
+			// 	git_commit* firstCommit = nullptr;
+			// 	// TODO: m_FirstCommitOid can be empty if we didn't create a base commit.
+			// 	// In that case, we should probably create a root commit?
+			// 	GIT2(git_commit_lookup(&firstCommit, m_Repo, &m_FirstCommitOid));
+			// 	GIT2(git_branch_create(&branch, m_Repo, branchName.c_str(), firstCommit, 0));
+			// 	git_commit_free(firstCommit);
+			// }
+
+			// targetBranchRef = git_reference_name(branch);
+
+			// // Make head point to the branch.
+			// git_reference* head;
+			// GIT2(git_reference_symbolic_create(&head, m_Repo, "HEAD", git_reference_name(branch), 1, branchName.c_str()));
+			// git_reference_free(head);
+			// git_reference_free(branch);
+
+			// // Now update the files in the index to match the content of the commit pointed at by HEAD.
+			// git_oid oidParentCommit;
+			// GIT2(git_reference_name_to_id(&oidParentCommit, m_Repo, "HEAD"));
+
+			// git_commit* headCommit = nullptr;
+			// GIT2(git_commit_lookup(&headCommit, m_Repo, &oidParentCommit));
+
+			// git_tree* headCommitTree = nullptr;
+			// GIT2(git_commit_tree(&headCommitTree, headCommit));
+
+			// GIT2(git_index_read_tree(m_Index, headCommitTree));
+
+			// git_tree_free(headCommitTree);
+			// git_commit_free(headCommit);
 		}
-		// If the HEAD doesn't exist yet, nothing we need to do. Otherwise, we load
-		// it's current tree into our index.
-		if (exitCode != GIT_ENOTFOUND)
+		else
 		{
-			git_commit* headCommit;
-			GIT2(git_commit_lookup(&headCommit, m_Repo, &headCommitSHA));
-			git_tree* headTree;
-			GIT2(git_commit_tree(&headTree, headCommit));
-			// Load the current tree into the index.
-			GIT2(git_index_read_tree(idx, headTree));
-			git_tree_free(headTree);
-			git_commit_free(headCommit);
+			// Create a new in-memory index for current HEAD.
+			GIT2(git_index_new(&idx));
+			git_oid headCommitSHA;
+			int exitCode = git_reference_name_to_id(&headCommitSHA, m_Repo, "HEAD");
+			if (exitCode != 0 && exitCode != GIT_ENOTFOUND)
+			{
+				GIT2(exitCode);
+			}
+			// If the HEAD doesn't exist yet, nothing we need to do. Otherwise, we load
+			// it's current tree into our index.
+			if (exitCode != GIT_ENOTFOUND)
+			{
+				git_commit* headCommit;
+				GIT2(git_commit_lookup(&headCommit, m_Repo, &headCommitSHA));
+				git_tree* headTree;
+				GIT2(git_commit_tree(&headTree, headCommit));
+				// Load the current tree into the index.
+				GIT2(git_index_read_tree(idx, headTree));
+				git_tree_free(headTree);
+				git_commit_free(headCommit);
+			}
+			// Now we have an in-memory index with the current contents of HEAD.
 		}
-		// Now we have an in-memory index with the current contents of HEAD.
+		lastBranchTree[targetBranch] = idx;
 	}
 
 	for (auto& file : files)
@@ -359,8 +375,6 @@ std::string GitAPI::WriteChangelistBranch(
 
 		commitSHA = git_oid_tostr_s(&commitID);
 	}
-
-	git_index_free(idx);
 
 	return commitSHA;
 }

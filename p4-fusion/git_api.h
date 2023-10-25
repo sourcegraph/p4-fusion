@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <map>
 
 #include "common.h"
 #include "commands/file_data.h"
@@ -51,6 +52,7 @@ class GitAPI
 	git_oid m_FirstCommitOid;
 	std::string repoPath;
 	int timezoneMinutes;
+	std::map<std::string, git_index*> lastBranchTree;
 
 public:
 	GitAPI(const std::string& repoPath, bool fsyncEnable, int timezoneMinutes);
@@ -66,7 +68,7 @@ public:
 	/* Checks if a previous commit was made and extracts the corresponding changelist number. */
 	const std::string DetectLatestCL() const;
 
-	/* files are cleared as they are visited. Empty targetBranch means HEAD. */
+	/* files are cleared as they are visited. Empty targetBranch means HEAD. Only use this method on the main thread! */
 	std::string WriteChangelistBranch(
 	    const std::string& depotPath,
 	    const ChangeList& cl,
@@ -74,5 +76,5 @@ public:
 	    const std::string& targetBranch,
 	    const std::string& authorName,
 	    const std::string& authorEmail,
-	    const std::string& mergeFrom) const;
+	    const std::string& mergeFrom);
 };
