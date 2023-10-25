@@ -89,7 +89,7 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 					printBatchFileData->push_back(&fileData);
 
 					// Clear the batches if it fits
-					if (printBatchFileData->size() == printBatch)
+					if (printBatchFileData->size() >= printBatch)
 					{
 						Flush(p4, printBatchFileData);
 
@@ -125,30 +125,46 @@ void ChangeList::Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>&
 		return;
 	}
 
+	// Now we write the files that PrintFiles will give us to the git ODB in a
+	// streaming fashion.
+	// Idx keeps track of the files index in printBatchFileData and is increased
+	// every time we are told about a new file.
+	// The PrintFiles function takes two callbacks, one for stat, basically "a new
+	// file begins here", and then for small chunks of data of that file.
 	long idx = -1;
 	bool flushed = true;
 	PrintResult printResp = p4.PrintFiles(
 	    fileRevisions, [&idx, &printBatchFileData, &flushed]
 	    {
+			// For the first file, we don't need to run finalize on the previous
+			// file so we're done here.
 		    if (idx == -1)
 		    {
 			    idx++;
 			    printBatchFileData->at(idx)->StartWrite();
+				// Also, we've seen at least one file now so instruct to flush
+				// once more at the end.
+				// That is because we don't get a Stat event after the last file.
 			    flushed = false;
 			    return;
 		    }
+			// First, finalize the previous file.
 		    printBatchFileData->at(idx)->Finalize();
+			// Now step one file further.
 		    idx++;
-		    printBatchFileData->at(idx)->StartWrite();
-		    flushed = false; },
+			// And start a write for the next file.
+		    printBatchFileData->at(idx)->StartWrite(); },
 	    [&idx, &printBatchFileData](const char* contents, int length)
 	    {
+			// Write a chunk of the data to the currently processed file.
 		    printBatchFileData->at(idx)->Write(contents, length);
 	    });
 	if (printResp.HasError())
 	{
 		throw std::runtime_error(printResp.PrintError());
 	}
+	// If we have seen at least one file, we have to flush the last open file
+	// to the ODB still, so let's do that.
 	if (!flushed)
 	{
 		printBatchFileData->back()->Finalize();

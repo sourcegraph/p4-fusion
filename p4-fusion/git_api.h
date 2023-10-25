@@ -30,7 +30,11 @@ public:
 	BlobWriter() = delete;
 	BlobWriter(git_repository* repo);
 
+	// Write creates a new ODB entry on the first call and continuous calls keep
+	// writing more data to it.
 	void Write(const char* contents, int length);
+	// Close MUST be called at the end of the writing process to finalize the ODB entry
+	// and to move it into it's proper place on disk.
 	std::string Close();
 };
 
@@ -47,6 +51,8 @@ public:
 	GitAPI() = delete;
 	~GitAPI();
 
+	// WriteBlob returns a new BlobWriter instance that allows to write a single
+	// blob to the repository's ODB.
 	BlobWriter* WriteBlob() const;
 
 	void InitializeRepository(bool noCreateBaseCommit);
