@@ -10,6 +10,7 @@
 #include <sstream>
 #include <typeinfo>
 #include <csignal>
+#include <cerrno>
 
 #include "common.h"
 
@@ -63,9 +64,67 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	// Set the signal here because it gets reset after P4API library is initialized.
-	std::signal(SIGINT, SignalHandler);
-	std::signal(SIGTERM, SignalHandler);
+	// Block signals from being handled by the main thread, and all future threads.
+	//
+	// - SIGINT, SIGTERM, SIGHUP: thread pool will be shutdown and std::exit will be called
+	// - SIGUSR1: only sent by main() to tell the signal handler thread to exit
+	sigset_t blockedSignals;
+	sigemptyset(&blockedSignals);
+	for (auto sig : { SIGINT, SIGTERM, SIGHUP, SIGUSR1 })
+	{
+		sigaddset(&blockedSignals, sig);
+	}
+
+	int rc = pthread_sigmask(SIG_BLOCK, &blockedSignals, nullptr);
+	if (rc != 0)
+	{
+		ERR("(signal handler) failed to block signals: (" << errno << ") " << strerror(errno));
+		return 1;
+	}
+
+	// Create the thread pool
+	int networkThreads = arguments.GetNetworkThreads();
+	PRINT("Network Threads: " << networkThreads);
+	PRINT("Creating " << networkThreads << " network threads");
+	ThreadPool pool(networkThreads);
+	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
+
+	// Spawn a thread to handle signals.
+	// The thread will block and wait for signals to arrive and then shutdown the thread pool, unless it receives SIGUSR1,
+	// in which case it will just exit (since main() is handling the shutdown).
+	//
+	// Using a separate thread for purely signal handling allows us to use non-reentrant functions
+	// (such as std::cout, condition variables, etc.) in the signal handler.
+	auto signalHandlingThread = std::thread(
+	    [&blockedSignals, &pool]()
+	    {
+		    // Wait for signals to arrive.
+		    int sig = 0;
+		    int rc = sigwait(&blockedSignals, &sig);
+		    if (rc != 0)
+		    {
+			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
+			    pool.ShutDown();
+			    std::exit(rc);
+		    }
+
+		    // Did main() tell us to shutdown?
+		    if (sig == SIGUSR1)
+		    {
+			    // Yes, so no need to print anything - just exit.
+			    return;
+		    }
+
+		    // Otherwise, we received a signal from the OS - print a message and shutdown.
+		    if (!sigismember(&blockedSignals, sig))
+		    {
+			    ERR("(signal handler): WARNING: received signal (" << sig << ") \"" << strsignal(sig) << "\" that is not blocked, this should not happen and indicates a logic error in the signal handler.");
+		    }
+
+		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down thread pool");
+		    pool.ShutDown();
+		    std::exit(sig);
+	    });
 
 	P4API::P4PORT = arguments.GetPort();
 	P4API::P4USER = arguments.GetUsername();
@@ -119,7 +178,6 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	int networkThreads = arguments.GetNetworkThreads();
 	int printBatch = arguments.GetPrintBatch();
 	int lookAhead = arguments.GetLookAhead();
 	P4API::CommandRetries = arguments.GetRetries();
@@ -136,7 +194,6 @@ int Main(int argc, char** argv)
 	PRINT("Perforce User: " << P4API::P4USER);
 	PRINT("Perforce Client: " << P4API::P4CLIENT);
 	PRINT("Depot Path: " << depotPath);
-	PRINT("Network Threads: " << networkThreads);
 	PRINT("Print Batch: " << printBatch);
 	PRINT("Look Ahead: " << lookAhead);
 	PRINT("Max Retries: " << P4API::CommandRetries);
@@ -204,10 +261,6 @@ int Main(int argc, char** argv)
 		return 0;
 	}
 	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
-
-	PRINT("Creating " << networkThreads << " network threads");
-	ThreadPool pool(networkThreads);
-	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
 
 	auto t = std::thread([&pool]()
 	    {
@@ -337,6 +390,9 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
 
+	pthread_kill(signalHandlingThread.native_handle(), SIGUSR1); // Tell the signal handler thread to exit.
+	signalHandlingThread.join(); // Wait for the signal handler thread to exit.
+
 	pool.ShutDown();
 
 	// Wait for exception handler to finish.
@@ -352,24 +408,6 @@ int Main(int argc, char** argv)
 	mtr_shutdown();
 
 	return 0;
-}
-
-void SignalHandler(sig_atomic_t s)
-{
-	static bool called = false;
-	if (called)
-	{
-		WARN("Already received an interrupt signal, waiting for threads to shutdown.");
-		return;
-	}
-	called = true;
-
-	ERR("Signal Received: " << strsignal(s));
-
-	// TODO: Propagate cancel signal to main function.
-	// pool.ShutDown();
-
-	std::exit(s);
 }
 
 int main(int argc, char** argv)
