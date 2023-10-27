@@ -98,13 +98,23 @@ int Main(int argc, char** argv)
 	auto signalHandlingThread = std::thread(
 	    [&blockedSignals, &pool]()
 	    {
+		    auto shutdown = [&pool]()
+		    {
+			    pool.ShutDown();
+
+			    P4API::ShutdownLibraries();
+
+			    mtr_flush();
+			    mtr_shutdown();
+		    };
+
 		    // Wait for signals to arrive.
 		    int sig = 0;
 		    int rc = sigwait(&blockedSignals, &sig);
 		    if (rc != 0)
 		    {
 			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
-			    pool.ShutDown();
+			    shutdown();
 			    std::exit(rc);
 		    }
 
@@ -121,8 +131,8 @@ int Main(int argc, char** argv)
 			    ERR("(signal handler): WARNING: received signal (" << sig << ") \"" << strsignal(sig) << "\" that is not blocked, this should not happen and indicates a logic error in the signal handler.");
 		    }
 
-		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down thread pool");
-		    pool.ShutDown();
+		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down");
+		    shutdown();
 		    std::exit(sig);
 	    });
 
