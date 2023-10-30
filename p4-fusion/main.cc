@@ -89,6 +89,7 @@ int Main(int argc, char** argv)
 	ThreadPool pool(networkThreads);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
 
+	sigset_t signalsToWaitOn = blockedSignals;
 	// Spawn a thread to handle signals.
 	// The thread will block and wait for signals to arrive and then shutdown the thread pool, unless it receives SIGUSR1,
 	// in which case it will just exit (since main() is handling the shutdown).
@@ -96,7 +97,7 @@ int Main(int argc, char** argv)
 	// Using a separate thread for purely signal handling allows us to use non-reentrant functions
 	// (such as std::cout, condition variables, etc.) in the signal handler.
 	auto signalHandlingThread = std::thread(
-	    [&blockedSignals, &pool]()
+	    [signalsToWaitOn, &pool]()
 	    {
 		    auto shutdown = [&pool]()
 		    {
@@ -110,7 +111,7 @@ int Main(int argc, char** argv)
 
 		    // Wait for signals to arrive.
 		    int sig = 0;
-		    int rc = sigwait(&blockedSignals, &sig);
+		    int rc = sigwait(&signalsToWaitOn, &sig);
 		    if (rc != 0)
 		    {
 			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
@@ -126,7 +127,7 @@ int Main(int argc, char** argv)
 		    }
 
 		    // Otherwise, we received a signal from the OS - print a message and shutdown.
-		    if (!sigismember(&blockedSignals, sig))
+		    if (!sigismember(&signalsToWaitOn, sig))
 		    {
 			    ERR("(signal handler): WARNING: received signal (" << sig << ") \"" << strsignal(sig) << "\" that is not blocked, this should not happen and indicates a logic error in the signal handler.");
 		    }
