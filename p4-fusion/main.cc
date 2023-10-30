@@ -84,7 +84,6 @@ int Main(int argc, char** argv)
 
 	// Create the thread pool
 	int networkThreads = arguments.GetNetworkThreads();
-	PRINT("Network Threads: " << networkThreads);
 	PRINT("Creating " << networkThreads << " network threads");
 	ThreadPool pool(networkThreads);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool");
@@ -193,6 +192,7 @@ int Main(int argc, char** argv)
 	PRINT("Perforce User: " << P4API::P4USER);
 	PRINT("Perforce Client: " << P4API::P4CLIENT);
 	PRINT("Depot Path: " << depotPath);
+	PRINT("Network Threads: " << networkThreads);
 	PRINT("Print Batch: " << printBatch);
 	PRINT("Look Ahead: " << lookAhead);
 	PRINT("Max Retries: " << P4API::CommandRetries);
