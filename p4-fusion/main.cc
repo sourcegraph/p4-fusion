@@ -27,7 +27,7 @@
 
 #define P4_FUSION_VERSION "v1.13.1-sg"
 
-void SignalHandler(sig_atomic_t s);
+void shutdown(ThreadPool& pool, int exitCode);
 
 int Main(int argc, char** argv)
 {
@@ -99,24 +99,13 @@ int Main(int argc, char** argv)
 	auto signalHandlingThread = std::thread(
 	    [signalsToWaitOn, &pool]()
 	    {
-		    auto shutdown = [&pool]()
-		    {
-			    pool.ShutDown();
-
-			    P4API::ShutdownLibraries();
-
-			    mtr_flush();
-			    mtr_shutdown();
-		    };
-
 		    // Wait for signals to arrive.
 		    int sig = 0;
 		    int rc = sigwait(&signalsToWaitOn, &sig);
 		    if (rc != 0)
 		    {
 			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
-			    shutdown();
-			    std::exit(rc);
+			    shutdown(pool, rc);
 		    }
 
 		    // Did main() tell us to shutdown?
@@ -133,8 +122,7 @@ int Main(int argc, char** argv)
 		    }
 
 		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down");
-		    shutdown();
-		    std::exit(sig);
+		    shutdown(pool, sig);
 	    });
 
 	P4API::P4PORT = arguments.GetPort();
@@ -419,6 +407,18 @@ int Main(int argc, char** argv)
 	mtr_shutdown();
 
 	return 0;
+}
+
+void shutdown(ThreadPool& pool, int exitCode)
+{
+	pool.ShutDown();
+
+	P4API::ShutdownLibraries();
+
+	mtr_flush();
+	mtr_shutdown();
+
+	std::exit(exitCode);
 }
 
 int main(int argc, char** argv)
