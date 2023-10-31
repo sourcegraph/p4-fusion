@@ -27,7 +27,7 @@
 
 #define P4_FUSION_VERSION "v1.13.1-sg"
 
-void shutdown(ThreadPool& pool, int exitCode);
+void shutdown(ThreadPool& pool);
 
 int Main(int argc, char** argv)
 {
@@ -99,12 +99,13 @@ int Main(int argc, char** argv)
 	    [signalsToWaitOn, &pool]()
 	    {
 		    // Wait for signals to arrive.
-		    int sig = 0;
+		    int sig;
 		    int rc = sigwait(&signalsToWaitOn, &sig);
 		    if (rc != 0)
 		    {
 			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
-			    shutdown(pool, rc);
+			    shutdown(pool);
+			    std::exit(errno);
 		    }
 
 		    // Did main() tell us to shutdown?
@@ -121,7 +122,8 @@ int Main(int argc, char** argv)
 		    }
 
 		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down");
-		    shutdown(pool, sig);
+		    shutdown(pool);
+		    std::exit(sig);
 	    });
 
 	P4API::P4PORT = arguments.GetPort();
@@ -261,7 +263,7 @@ int Main(int argc, char** argv)
 	}
 	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number);
 
-	auto t = std::thread([&pool]()
+	auto exceptionHandlingThread = std::thread([&pool]()
 	    {
 			// See if the threadpool encountered any exceptions.
 			try
@@ -389,27 +391,22 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << changes.size() << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs");
 
-	pthread_kill(signalHandlingThread.native_handle(), SIGUSR1); // Tell the signal handler thread to exit.
-	signalHandlingThread.join(); // Wait for the signal handler thread to exit.
+	shutdown(pool); // Shut down thread pool, P4API, and tracing.
 
-	pool.ShutDown();
-
-	// Wait for exception handler to finish.
-	t.join();
-
-	if (!P4API::ShutdownLibraries())
+	rc = pthread_kill(signalHandlingThread.native_handle(), SIGUSR1); // Tell the signal handler thread to exit.
+	if (rc != 0)
 	{
-		return 1;
+		ERR("(signal handler) failed to shut down signal handling thread: (" << errno << ") " << strerror(errno));
+		return errno;
 	}
 
-	// Finalize tracing.
-	mtr_flush();
-	mtr_shutdown();
+	signalHandlingThread.join(); // Wait for the signal handler thread to exit.
+	exceptionHandlingThread.join(); // Wait for the exception handling thread to exit.
 
 	return 0;
 }
 
-void shutdown(ThreadPool& pool, int exitCode)
+void shutdown(ThreadPool& pool)
 {
 	pool.ShutDown();
 
@@ -417,8 +414,6 @@ void shutdown(ThreadPool& pool, int exitCode)
 
 	mtr_flush();
 	mtr_shutdown();
-
-	std::exit(exitCode);
 }
 
 int main(int argc, char** argv)
