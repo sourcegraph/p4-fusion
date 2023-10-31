@@ -49,7 +49,7 @@ public:
 	ThreadPool() = delete;
 	~ThreadPool();
 
-	void AddJob(const Job& function);
+	void AddJob(Job&& function);
 	void RaiseCaughtExceptions();
 	void ShutDown();
 	size_t GetThreadCount() const

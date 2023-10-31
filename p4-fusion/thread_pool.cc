@@ -13,7 +13,7 @@
 
 #include "minitrace.h"
 
-void ThreadPool::AddJob(const Job& function)
+void ThreadPool::AddJob(Job&& function)
 {
 	// Fast path: if we're shutting down, don't even bother adding the job to
 	// the queue.
@@ -28,7 +28,7 @@ void ThreadPool::AddJob(const Job& function)
 		return;
 	}
 
-	m_Jobs.push_back(function);
+	m_Jobs.push_back(std::move(function));
 	// Inform the next available job handler that there's new work.
 	m_CV.notify_one();
 }
