@@ -22,6 +22,7 @@ typedef std::function<void(P4API&, GitAPI&)> Job;
 
 class ThreadPool
 {
+	mutable std::mutex m_ThreadMutex;
 	std::vector<std::thread> m_Threads;
 	std::mutex m_ThreadExceptionsMutex;
 	std::condition_variable m_ThreadExceptionCV;
@@ -32,7 +33,7 @@ class ThreadPool
 
 	std::condition_variable m_CV;
 
-	std::atomic<bool> m_ShouldStop;
+	std::mutex m_ShutdownMutex;
 	std::atomic<bool> m_HasShutDownBeenCalled;
 
 public:
@@ -40,8 +41,12 @@ public:
 	ThreadPool() = delete;
 	~ThreadPool();
 
-	void AddJob(const Job& function);
+	void AddJob(Job&& function);
 	void RaiseCaughtExceptions();
 	void ShutDown();
-	size_t GetThreadCount() const { return m_Threads.size(); }
+	size_t GetThreadCount() const
+	{
+		std::lock_guard<std::mutex> lock(m_ThreadMutex);
+		return m_Threads.size();
+	}
 };

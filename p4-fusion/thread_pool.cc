@@ -10,18 +10,22 @@
 #include "minitrace.h"
 #include "git_api.h"
 
-void ThreadPool::AddJob(const Job& function)
+void ThreadPool::AddJob(Job&& function)
 {
-	// Check if we want to accept more work.
+	// Fast path: if we're shutting down, don't even bother adding the job to
+	// the queue.
 	if (m_HasShutDownBeenCalled)
 	{
 		return;
 	}
 
+	std::lock_guard<std::mutex> lock(m_JobsMutex);
+	if (m_HasShutDownBeenCalled) // Check again, in case we shut down while waiting for the lock.
 	{
-		std::unique_lock<std::mutex> lock(m_JobsMutex);
-		m_Jobs.push_back(function);
+		return;
 	}
+
+	m_Jobs.push_back(std::move(function));
 	// Inform the next available job handler that there's new work.
 	m_CV.notify_one();
 }
@@ -47,27 +51,40 @@ void ThreadPool::RaiseCaughtExceptions()
 
 void ThreadPool::ShutDown()
 {
-	if (m_HasShutDownBeenCalled)
+	std::lock_guard<std::mutex> shutdownLock(m_ShutdownMutex); // Prevent multiple threads from shutting down the pool.
+	if (m_HasShutDownBeenCalled) // We've already shut down.
 	{
 		return;
 	}
-	m_HasShutDownBeenCalled = true;
 
+	// Signal that we want to shut down.
 	{
 		std::lock_guard<std::mutex> lock(m_JobsMutex);
-		m_ShouldStop = true;
+		m_HasShutDownBeenCalled = true;
 	}
-	m_CV.notify_all();
-	m_ThreadExceptionCV.notify_all();
 
-	// Wait for all worker threads to finish.
-	for (auto& thread : m_Threads)
+	m_CV.notify_all(); // Tell all the worker threads to stop waiting for new jobs.
+	m_ThreadExceptionCV.notify_all(); // Tell the exception handler to stop waiting for new exceptions.
+
+	// Wait for all worker threads to finish, then release them.
 	{
-		thread.join();
+		std::lock_guard<std::mutex> lock(m_ThreadMutex);
+
+		for (auto& thread : m_Threads)
+		{
+			thread.join();
+		}
+
+		m_Threads.clear();
 	}
 
-	m_Threads.clear();
+	// Clear the job queue.
+	{
+		std::lock_guard<std::mutex> lock(m_JobsMutex);
+		m_Jobs.clear();
+	}
 
+	// Clear the exception queue.
 	{
 		std::lock_guard<std::mutex> lock(m_ThreadExceptionsMutex);
 		m_ThreadExceptions.clear();
@@ -80,7 +97,9 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
     : m_HasShutDownBeenCalled(false)
     , m_ShouldStop(false)
 {
-	// Initialize size threads.
+	// Initialize the thread handlers
+	std::lock_guard<std::mutex> threadsLock(m_ThreadMutex);
+
 	for (int i = 0; i < size; i++)
 	{
 		m_Threads.emplace_back([this, i, &repoPath, &fsyncEnable, &tz]()
@@ -103,9 +122,9 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
 						std::unique_lock<std::mutex> lock(m_JobsMutex);
 
 						m_CV.wait(lock, [this]()
-							{ return !m_Jobs.empty() || m_ShouldStop; });
+							{ return !m_Jobs.empty() || m_HasShutDownBeenCalled; });
 
-						if (m_ShouldStop)
+						if (m_HasShutDownBeenCalled) // We're shutting down - exit.
 						{
 							break;
 						}
