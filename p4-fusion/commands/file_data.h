@@ -58,7 +58,8 @@ struct FileDataStore
 	bool isDeleted {};
 	bool isIntegrated {}; // ... or copied, or moved, or ...
 
-	FileDataStore();
+	FileDataStore() = delete;
+	FileDataStore(std::string& _depotFile, std::string& _revision, std::string& action, std::string& type);
 
 	void SetAction(std::string action);
 
@@ -103,7 +104,7 @@ public:
 	};
 	bool IsDeleted() const { return m_data->isDeleted; };
 	bool IsIntegrated() const { return m_data->isIntegrated; };
-	std::string& GetFromDepotFile() const { return m_data->fromDepotFile; };
+	const std::string& GetFromDepotFile() const { return m_data->fromDepotFile; };
 
 	bool IsBinary() const { return m_data->isBinary; };
 	bool IsExecutable() const { return m_data->isExecutable; };

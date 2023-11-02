@@ -123,7 +123,10 @@ void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileDa
 	fileRevisions.reserve(printBatchFileData.size());
 	for (auto fileData : printBatchFileData)
 	{
-		fileRevisions.push_back(fileData->GetDepotFile() + "#" + fileData->GetRevision());
+		std::string fileSpec = fileData->GetDepotFile();
+		fileSpec.append("#");
+		fileSpec.append(fileData->GetRevision());
+		fileRevisions.push_back(fileSpec);
 	}
 
 	// Now we write the files that PrintFiles will give us to the git ODB in a

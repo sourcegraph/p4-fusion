@@ -7,27 +7,22 @@
 #include "file_data.h"
 #include "git_api.h"
 
-FileDataStore::FileDataStore()
-    : actionCategory(FileAction::FileAdd)
+FileDataStore::FileDataStore(std::string& _depotFile, std::string& _revision, std::string& action, std::string& type)
+    : depotFile(_depotFile)
+    , revision(_revision)
+    , isBinary(STDHelpers::Contains(type, "binary"))
+    , isExecutable(STDHelpers::Contains(type, "+x"))
     , isBlobOIDSet(false)
     , isContentsPendingDownload(false)
-    , isBinary(false)
-    , isExecutable(false)
 {
+	SetAction(action);
 }
 
 FileData::FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type)
-    : m_data(std::make_shared<FileDataStore>())
+    : m_data(std::make_shared<FileDataStore>(depotFile, revision, action, type))
     , m_Git(git)
     , writer(nullptr)
 {
-	m_data->depotFile = depotFile;
-	m_data->revision = revision;
-	m_data->SetAction(action);
-	m_data->isBinary = STDHelpers::Contains(type, "binary");
-	m_data->isExecutable = STDHelpers::Contains(type, "+x");
-	m_data->isBlobOIDSet = false;
-	m_data->isContentsPendingDownload = false;
 }
 
 FileData::~FileData()

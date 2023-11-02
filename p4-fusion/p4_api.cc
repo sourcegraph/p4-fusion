@@ -231,12 +231,12 @@ UsersResult P4API::Users()
 	return Run<UsersResult>("users", {
 	                                     "-a" // Include service accounts
 	                                 },
-	    []()
-	    { return UsersResult(); });
+	    []() -> UsersResult
+	    { return {}; });
 }
 
 InfoResult P4API::Info()
 {
-	return Run<InfoResult>("info", {}, []()
-	    { return InfoResult(); });
+	return Run<InfoResult>("info", {}, []() -> InfoResult
+	    { return {}; });
 }
