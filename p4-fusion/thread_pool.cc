@@ -95,7 +95,6 @@ void ThreadPool::ShutDown()
 
 ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool fsyncEnable, const int tz)
     : m_HasShutDownBeenCalled(false)
-    , m_ShouldStop(false)
 {
 	// Initialize the thread handlers
 	std::lock_guard<std::mutex> threadsLock(m_ThreadMutex);
@@ -109,6 +108,10 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
 
 			    // Initialize p4 API.
 			    P4API p4;
+			    // We initialize a separate GitAPI per thread, otherwise
+			    // internal locks will prevent the threads from working independently.
+			    // We only write blob objects to the ODB, which according to libgit2/libgit2#2491
+			    // is thread safe.
 			    GitAPI git(repoPath, fsyncEnable, tz);
 
 			    git.OpenRepository();

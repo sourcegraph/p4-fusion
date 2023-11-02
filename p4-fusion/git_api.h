@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <map>
+#include <unordered_map>
 
 #include "common.h"
 #include "commands/file_data.h"
@@ -23,8 +23,12 @@ class BlobWriter
 private:
 	git_repository* repo;
 	git_writestream* writer;
-	bool begun;
-	bool finalized;
+	enum class State
+	{
+		Uninitialized,
+		ReadyToWrite,
+		Closed,
+	} state;
 
 public:
 	BlobWriter() = delete;
@@ -44,7 +48,7 @@ class GitAPI
 	git_oid m_FirstCommitOid;
 	std::string repoPath;
 	int timezoneMinutes;
-	std::map<std::string, git_index*> lastBranchTree;
+	std::unordered_map<std::string, git_index*> lastBranchTree;
 
 public:
 	GitAPI(const std::string& repoPath, bool fsyncEnable, int timezoneMinutes);

@@ -15,7 +15,7 @@
 #include "utils/std_helpers.h"
 #include "minitrace.h"
 
-ChangeList::ChangeList(const int& clNumber, std::string clDescription, std::string userID, const int64_t& clTimestamp)
+ChangeList::ChangeList(const int& clNumber, std::string&& clDescription, std::string&& userID, const int64_t& clTimestamp)
     : number(clNumber)
     , user(std::move(userID))
     , description(std::move(clDescription))
@@ -74,7 +74,7 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 		    { return downloadPrepared->load(); });
 	}
 
-	std::shared_ptr<std::vector<FileData*>> printBatchFileData = std::make_shared<std::vector<FileData*>>();
+	std::vector<FileData*> printBatchFileData;
 	// Only perform the group inspection if there are files.
 	if (changedFileGroups->totalFileCount > 0)
 	{
@@ -86,15 +86,15 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 				if (fileData.IsDownloadNeeded())
 				{
 					fileData.SetPendingDownload();
-					printBatchFileData->push_back(&fileData);
+					printBatchFileData.push_back(&fileData);
 
 					// Clear the batches if it fits
-					if (printBatchFileData->size() >= printBatch)
+					if (printBatchFileData.size() >= printBatch)
 					{
 						Flush(p4, printBatchFileData);
 
 						// We let go of the refs held by us and create new ones to queue the next batch
-						printBatchFileData->clear();
+						printBatchFileData.clear();
 						// Now only the thread job has access to the older batch
 					}
 				}
@@ -109,20 +109,21 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 	commitCV->notify_all();
 }
 
-void ChangeList::Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData)
+void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileData)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
-	std::vector<std::string> fileRevisions;
-	for (auto fileData : *printBatchFileData)
-	{
-		fileRevisions.push_back(fileData->GetDepotFile() + "#" + fileData->GetRevision());
-	}
-
 	// Only perform the batch processing when there are files to process.
-	if (fileRevisions.empty())
+	if (printBatchFileData.empty())
 	{
 		return;
+	}
+
+	std::vector<std::string> fileRevisions;
+	fileRevisions.reserve(printBatchFileData.size());
+	for (auto fileData : printBatchFileData)
+	{
+		fileRevisions.push_back(fileData->GetDepotFile() + "#" + fileData->GetRevision());
 	}
 
 	// Now we write the files that PrintFiles will give us to the git ODB in a
@@ -132,32 +133,27 @@ void ChangeList::Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>&
 	// The PrintFiles function takes two callbacks, one for stat, basically "a new
 	// file begins here", and then for small chunks of data of that file.
 	long idx = -1;
-	bool flushed = true;
 	PrintResult printResp = p4.PrintFiles(
-	    fileRevisions, [&idx, &printBatchFileData, &flushed]
+	    fileRevisions, [&idx, &printBatchFileData]
 	    {
 			// For the first file, we don't need to run finalize on the previous
 			// file so we're done here.
 		    if (idx == -1)
 		    {
 			    idx++;
-			    printBatchFileData->at(idx)->StartWrite();
-				// Also, we've seen at least one file now so instruct to flush
-				// once more at the end.
-				// That is because we don't get a Stat event after the last file.
-			    flushed = false;
+			    printBatchFileData.at(idx)->StartWrite();
 			    return;
 		    }
 			// First, finalize the previous file.
-		    printBatchFileData->at(idx)->Finalize();
+		    printBatchFileData.at(idx)->Finalize();
 			// Now step one file further.
 		    idx++;
 			// And start a write for the next file.
-		    printBatchFileData->at(idx)->StartWrite(); },
+		    printBatchFileData.at(idx)->StartWrite(); },
 	    [&idx, &printBatchFileData](const char* contents, int length)
 	    {
-			// Write a chunk of the data to the currently processed file.
-		    printBatchFileData->at(idx)->Write(contents, length);
+		    // Write a chunk of the data to the currently processed file.
+		    printBatchFileData.at(idx)->Write(contents, length);
 	    });
 	if (printResp.HasError())
 	{
@@ -165,9 +161,9 @@ void ChangeList::Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>&
 	}
 	// If we have seen at least one file, we have to flush the last open file
 	// to the ODB still, so let's do that.
-	if (!flushed)
+	if (idx > -1)
 	{
-		printBatchFileData->back()->Finalize();
+		printBatchFileData.back()->Finalize();
 	}
 }
 

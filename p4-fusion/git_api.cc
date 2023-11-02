@@ -34,7 +34,7 @@ GitAPI::GitAPI(const std::string& _repoPath, const bool fsyncEnable, const int t
 
 GitAPI::~GitAPI()
 {
-	std::map<std::string, git_index*>::iterator it;
+	std::unordered_map<std::string, git_index*>::iterator it;
 	for (it = lastBranchTree.begin(); it != lastBranchTree.end(); it++)
 	{
 		git_index_free(it->second);
@@ -393,8 +393,7 @@ std::string GitAPI::WriteChangelistBranch(
 BlobWriter::BlobWriter(git_repository* gitRepo)
     : repo(gitRepo)
     , writer(nullptr)
-    , begun(false)
-    , finalized(false)
+    , state(State::Uninitialized)
 {
 }
 
@@ -407,15 +406,15 @@ void BlobWriter::Write(const char* contents, int length)
 {
 	MTR_SCOPE("BlobWriter", __func__);
 
-	if (finalized)
+	if (state == State::Closed)
 	{
 		throw std::runtime_error("Called BlobWriter::Write after Close");
 	}
 
-	if (!begun)
+	if (state == State::Uninitialized)
 	{
 		GIT2(git_blob_create_from_stream(&writer, repo, nullptr));
-		begun = true;
+		state = State::ReadyToWrite;
 	}
 	GIT2(writer->write(writer, contents, length));
 }
@@ -424,14 +423,14 @@ std::string BlobWriter::Close()
 {
 	MTR_SCOPE("BlobWriter", __func__);
 
-	if (!begun)
+	if (state == State::Uninitialized)
 	{
 		// If nothing was written yet, it's most likely an empty file is written, so
 		// create a new stream and commit it right away.
 		Write("", 0);
 	}
 
-	if (finalized)
+	if (state == State::Closed)
 	{
 		throw std::runtime_error("Called BlobWriter::Close again");
 	}

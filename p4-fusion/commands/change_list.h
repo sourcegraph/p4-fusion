@@ -25,7 +25,7 @@ struct ChangeList
 	int64_t timestamp = 0;
 	std::unique_ptr<ChangedFileGroups> changedFileGroups = ChangedFileGroups::Empty();
 
-	ChangeList(const int& clNumber, std::string clDescription, std::string userID, const int64_t& clTimestamp);
+	ChangeList(const int& clNumber, std::string&& clDescription, std::string&& userID, const int64_t& clTimestamp);
 	ChangeList() = delete;
 	ChangeList(const ChangeList& other) = delete;
 	ChangeList& operator=(const ChangeList&) = delete;
@@ -39,7 +39,7 @@ struct ChangeList
 	void Clear();
 
 private:
-	static void Flush(P4API& p4, const std::shared_ptr<std::vector<FileData*>>& printBatchFileData);
+	static void Flush(P4API& p4, const std::vector<FileData*>& printBatchFileData);
 	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
 	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();

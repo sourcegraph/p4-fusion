@@ -9,20 +9,6 @@
 #include <map>
 #include <utility>
 
-static const std::string EMPTY_STRING;
-static const std::array<std::string, 2> INVALID_BRANCH_PATH { EMPTY_STRING, EMPTY_STRING };
-
-std::vector<std::string> BranchedFileGroup::GetRelativeFileNames()
-{
-	std::vector<std::string> ret;
-	ret.reserve(files.size());
-	for (auto& fileData : files)
-	{
-		ret.push_back(fileData.GetRelativePath());
-	}
-	return ret;
-}
-
 ChangedFileGroups::ChangedFileGroups()
     : totalFileCount(0)
 {
@@ -156,7 +142,7 @@ std::string BranchSet::stripBasePath(const std::string& depotPath) const
 		// strip off the leading '/', too.
 		return depotPath.substr(m_basePath.size());
 	}
-	return EMPTY_STRING;
+	return "";
 }
 
 struct branchIntegrationMap
@@ -174,7 +160,7 @@ struct branchIntegrationMap
 
 void branchIntegrationMap::addTarget(const std::string& targetBranch, const FileData& fileData)
 {
-	addMerge(EMPTY_STRING, targetBranch, fileData);
+	addMerge("", targetBranch, fileData);
 }
 
 void branchIntegrationMap::addMerge(const std::string& sourceBranch, const std::string& targetBranch, const FileData& fileData)
@@ -281,7 +267,7 @@ std::unique_ptr<ChangedFileGroups> BranchSet::ParseAffectedFiles(const std::vect
 			// It's a non-branching setup.
 			// Make sure the relative path is set.
 			fileData.SetRelativePath(relativeDepotPath);
-			branchMap.addTarget(EMPTY_STRING, fileData);
+			branchMap.addTarget("", fileData);
 		}
 	}
 	return branchMap.createChangedFileGroups();

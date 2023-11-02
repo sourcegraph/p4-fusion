@@ -81,50 +81,6 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	// Create the thread pool
-	int networkThreads = arguments.GetNetworkThreads();
-	PRINT("Creating " << networkThreads << " network threads")
-	ThreadPool pool(networkThreads, srcPath, fsyncEnable, timezoneMinutes);
-	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
-
-	sigset_t signalsToWaitOn = blockedSignals;
-	// Spawn a thread to handle signals.
-	// The thread will block and wait for signals to arrive and then shutdown the thread pool, unless it receives SIGUSR1,
-	// in which case it will just exit (since main() is handling the shutdown).
-	//
-	// Using a separate thread for purely signal handling allows us to use non-reentrant functions
-	// (such as std::cout, condition variables, etc.) in the signal handler.
-	auto signalHandlingThread = std::thread(
-	    [signalsToWaitOn, &pool]()
-	    {
-		    // Wait for signals to arrive.
-		    int sig;
-		    int rc = sigwait(&signalsToWaitOn, &sig);
-		    if (rc != 0)
-		    {
-			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno));
-			    shutdown(pool);
-			    std::exit(errno);
-		    }
-
-		    // Did main() tell us to shutdown?
-		    if (sig == SIGUSR1)
-		    {
-			    // Yes, so no need to print anything - just exit.
-			    return;
-		    }
-
-		    // Otherwise, we received a signal from the OS - print a message and shutdown.
-		    if (!sigismember(&signalsToWaitOn, sig))
-		    {
-			    ERR("(signal handler): WARNING: received signal (" << sig << ") \"" << strsignal(sig) << "\" that is not blocked, this should not happen and indicates a logic error in the signal handler.");
-		    }
-
-		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down");
-		    shutdown(pool);
-		    std::exit(sig);
-	    });
-
 	P4API::P4PORT = arguments.GetPort();
 	P4API::P4USER = arguments.GetUsername();
 
@@ -183,6 +139,50 @@ int Main(int argc, char** argv)
 		ERR("The depot path specified is not under the " << P4API::ClientSpec.client << " client spec. Consider changing the client spec so that it does. Exiting.")
 		return 1;
 	}
+
+	// Create the thread pool
+	int networkThreads = arguments.GetNetworkThreads();
+	PRINT("Creating " << networkThreads << " network threads")
+	ThreadPool pool(networkThreads, srcPath, fsyncEnable, timezoneMinutes);
+	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
+
+	sigset_t signalsToWaitOn = blockedSignals;
+	// Spawn a thread to handle signals.
+	// The thread will block and wait for signals to arrive and then shutdown the thread pool, unless it receives SIGUSR1,
+	// in which case it will just exit (since main() is handling the shutdown).
+	//
+	// Using a separate thread for purely signal handling allows us to use non-reentrant functions
+	// (such as std::cout, condition variables, etc.) in the signal handler.
+	auto signalHandlingThread = std::thread(
+	    [signalsToWaitOn, &pool]()
+	    {
+		    // Wait for signals to arrive.
+		    int sig;
+		    int rc = sigwait(&signalsToWaitOn, &sig);
+		    if (rc != 0)
+		    {
+			    ERR("(signal handler) failed to wait for signals: (" << errno << ") " << strerror(errno))
+			    shutdown(pool);
+			    std::exit(errno);
+		    }
+
+		    // Did main() tell us to shutdown?
+		    if (sig == SIGUSR1)
+		    {
+			    // Yes, so no need to print anything - just exit.
+			    return;
+		    }
+
+		    // Otherwise, we received a signal from the OS - print a message and shutdown.
+		    if (!sigismember(&signalsToWaitOn, sig))
+		    {
+			    ERR("(signal handler): WARNING: received signal (" << sig << ") \"" << strsignal(sig) << "\" that is not blocked, this should not happen and indicates a logic error in the signal handler.")
+		    }
+
+		    ERR("(signal handler) received signal (" << sig << ") \"" << strsignal(sig) << "\", shutting down")
+		    shutdown(pool);
+		    std::exit(sig);
+	    });
 
 	int printBatch = arguments.GetPrintBatch();
 	int lookAhead = arguments.GetLookAhead();
@@ -384,7 +384,7 @@ int Main(int argc, char** argv)
 			ChangeList& downloadCL = changes.at(next);
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
 			    {
-				downloadCL.PrepareDownload(p4, git,branchSet);
+				downloadCL.PrepareDownload(p4, git, branchSet);
 				downloadCL.StartDownload(p4, printBatch);
 				// Mark download as done.
 				downloaded++; });
