@@ -109,6 +109,56 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 	commitCV->notify_all();
 }
 
+class ChangeListPrintResultIterator : public PrintResult::PrintResultIterator
+{
+private:
+	const std::vector<FileData*>& printBatchFileData;
+	// Idx keeps track of the files index in printBatchFileData and is increased
+	// every time we are told about a new file.
+	// The PrintFiles function takes two callbacks, one for stat, basically "a new
+	// file begins here", and then for small chunks of data of that file.
+	long idx;
+
+public:
+	ChangeListPrintResultIterator(const std::vector<FileData*>& _printBatchFileData)
+	    : printBatchFileData(_printBatchFileData),
+		idx(-1)
+	{
+	}
+	~ChangeListPrintResultIterator()
+	{
+		// If we have seen at least one file, we have to flush the last open file
+		// to the ODB still, so let's do that.
+		if (idx > -1)
+		{
+			printBatchFileData.back()->Finalize();
+		}
+	}
+
+	void OnStat() override
+	{
+		// For the first file, we don't need to run finalize on the previous
+		// file so we're done here.
+		if (idx == -1)
+		{
+			idx++;
+			printBatchFileData.at(idx)->StartWrite();
+			return;
+		}
+		// First, finalize the previous file.
+		printBatchFileData.at(idx)->Finalize();
+		// Now step one file further.
+		idx++;
+		// And start a write for the next file.
+		printBatchFileData.at(idx)->StartWrite();
+	}
+	void OnOutput(const char* contents, int length) override
+	{
+		// Write a chunk of the data to the currently processed file.
+		printBatchFileData.at(idx)->Write(contents, length);
+	}
+};
+
 void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileData)
 {
 	MTR_SCOPE("ChangeList", __func__);
@@ -131,42 +181,10 @@ void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileDa
 
 	// Now we write the files that PrintFiles will give us to the git ODB in a
 	// streaming fashion.
-	// Idx keeps track of the files index in printBatchFileData and is increased
-	// every time we are told about a new file.
-	// The PrintFiles function takes two callbacks, one for stat, basically "a new
-	// file begins here", and then for small chunks of data of that file.
-	long idx = -1;
-	PrintResult printResp = p4.PrintFiles(
-	    fileRevisions, [&idx, &printBatchFileData]
-	    {
-			// For the first file, we don't need to run finalize on the previous
-			// file so we're done here.
-		    if (idx == -1)
-		    {
-			    idx++;
-			    printBatchFileData.at(idx)->StartWrite();
-			    return;
-		    }
-			// First, finalize the previous file.
-		    printBatchFileData.at(idx)->Finalize();
-			// Now step one file further.
-		    idx++;
-			// And start a write for the next file.
-		    printBatchFileData.at(idx)->StartWrite(); },
-	    [&idx, &printBatchFileData](const char* contents, int length)
-	    {
-		    // Write a chunk of the data to the currently processed file.
-		    printBatchFileData.at(idx)->Write(contents, length);
-	    });
+	PrintResult printResp = p4.PrintFiles(fileRevisions, ChangeListPrintResultIterator(printBatchFileData));
 	if (printResp.HasError())
 	{
 		throw std::runtime_error(printResp.PrintError());
-	}
-	// If we have seen at least one file, we have to flush the last open file
-	// to the ODB still, so let's do that.
-	if (idx > -1)
-	{
-		printBatchFileData.back()->Finalize();
 	}
 }
 

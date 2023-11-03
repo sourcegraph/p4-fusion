@@ -213,17 +213,17 @@ FileLogResult P4API::FileLog(GitAPI& git, const int changelist)
 	    { return { git }; });
 }
 
-PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput)
+PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, PrintResult::PrintResultIterator&& it)
 {
 	MTR_SCOPE("P4", __func__);
 
 	if (fileRevisions.empty())
 	{
-		return { onStat, onOutput };
+		return { std::make_shared<PrintResult::PrintResultIterator>() };
 	}
 
-	return Run<PrintResult>("print", fileRevisions, [&onStat, &onOutput]() -> PrintResult
-	    { return { onStat, onOutput }; });
+	return Run<PrintResult>("print", fileRevisions, []() -> PrintResult
+	    { return { std::make_shared<PrintResult::PrintResultIterator>() }; });
 }
 
 UsersResult P4API::Users()
