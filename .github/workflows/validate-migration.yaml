@@ -94,8 +94,15 @@ jobs:
           sudo apt-get install gettext --yes # for envsubst
           .github/workflows/run-test.sh
         env:
-          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
+          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           CMAKE_CXX_COMPILER: "clang++"
           CMAKE_C_COMPILER: "clang"
           CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -O0"
+
+      - name: "Ensure p4 client is deleted"
+        if: always()
+        run: |
+          p4 client -f -Fs -d "${P4CLIENT}" || true
+        env:
+          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}"
