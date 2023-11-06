@@ -23,8 +23,7 @@ jobs:
         sanitizer:
           - addressSanitizer
           - threadSanitizer
-          #          disabled until we figure out how to build with clang in github actions
-          #          - memorySanitizer
+          - memorySanitizer
           - leakSanitizer
           - undefinedSanitizer
           - noSanitizer
@@ -33,9 +32,8 @@ jobs:
             CMAKE_CXX_FLAGS: "-fsanitize=address -g"
           - sanitizer: threadSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=thread -g"
-          #          disabled until we figure out how to build with clang in github actions
-          #          - sanitizer: memorySanitizer
-          #            CMAKE_CXX_FLAGS: "-fsanitize=memory -g"
+          - sanitizer: memorySanitizer
+            CMAKE_CXX_FLAGS: "-fsanitize=memory -g"
           - sanitizer: leakSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=leak -g"
           - sanitizer: undefinedSanitizer
@@ -57,7 +55,7 @@ jobs:
       - name: "Install c++ compilation dependencies"
         run: |
           sudo apt-get update
-          sudo apt-get install git make cmake gcc g++ clang --yes # p4-fusion dependencies
+          sudo apt-get install git make cmake gcc g++ clang libc++-dev --yes # p4-fusion dependencies
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -89,13 +87,15 @@ jobs:
           pushd openssl-src
           ./config --prefix="${OPENSSL_INSTALL_DIR}" --static
           make install
-          popd 
+          popd
 
       - name: "Run validate migration script"
         run: |
-          sudo apt-get install gettext --yes # for envsubst 
+          sudo apt-get install gettext --yes # for envsubst
           .github/workflows/run-test.sh
         env:
           P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
+          CMAKE_CXX_COMPILER: "clang++"
+          CMAKE_C_COMPILER: "clang"
           CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -O0"

@@ -21,14 +21,6 @@ if (NOT DEFINED OPENSSL_ROOT_DIR)
     endif ()
 endif ()
 
-if (NOT DEFINED CMAKE_C_COMPILER)
-    set(CMAKE_C_COMPILER "/usr/bin/gcc")
-endif ()
-
-if (NOT DEFINED CMAKE_CXX_COMPILER)
-    set(CMAKE_CXX_COMPILER "/usr/bin/g++")
-endif ()
-
 option(MTR_ENABLED "Enable minitrace profiling" OFF)
 option(BUILD_TESTS "Build tests" OFF)
 
