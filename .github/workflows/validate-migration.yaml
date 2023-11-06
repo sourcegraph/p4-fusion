@@ -29,15 +29,15 @@ jobs:
           - noSanitizer
         include:
           - sanitizer: addressSanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=address -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=address -fno-sanitize-recover=all -g"
           - sanitizer: threadSanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=thread -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=thread -fno-sanitize-recover=all -g"
           - sanitizer: memorySanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=memory -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -g"
           - sanitizer: leakSanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=leak -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=leak -fno-sanitize-recover=all -g"
           - sanitizer: undefinedSanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=undefined -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=undefined -fno-sanitize-recover=all -g"
           - sanitizer: noSanitizer
             CMAKE_CXX_FLAGS: ""
 
