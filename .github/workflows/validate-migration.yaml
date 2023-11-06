@@ -33,7 +33,7 @@ jobs:
           - sanitizer: threadSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=thread -fno-sanitize-recover=all -g"
           - sanitizer: memorySanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -fPIE -pie -fsanitize-memory-track-origins -g"
           - sanitizer: leakSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=leak -fno-sanitize-recover=all -g"
           - sanitizer: undefinedSanitizer
@@ -55,7 +55,7 @@ jobs:
       - name: "Install c++ compilation dependencies"
         run: |
           sudo apt-get update
-          sudo apt-get install git make cmake gcc g++ clang libc++-dev --yes # p4-fusion dependencies
+          sudo apt-get install git make cmake gcc g++ clang libc++-dev llvm --yes # p4-fusion dependencies
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -98,7 +98,7 @@ jobs:
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           CMAKE_CXX_COMPILER: "clang++"
           CMAKE_C_COMPILER: "clang"
-          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -O0"
+          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
 
       - name: "Ensure p4 client is deleted"
         if: always()
