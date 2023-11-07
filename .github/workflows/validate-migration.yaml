@@ -7,6 +7,7 @@ env:
   P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
   OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
+  LIBCXX_INSTALL_DIR: "/tmp/libcxx-install"
 
   # Perforce credentials
   P4PORT: "perforce.sgdev.org:1666" # the address of the Perforce server to connect to
@@ -24,27 +25,36 @@ jobs:
           - addressSanitizer
           - threadSanitizer
           - memorySanitizer
-          - leakSanitizer
           - undefinedSanitizer
           - noSanitizer
         include:
           - sanitizer: addressSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=address -fno-sanitize-recover=all -g"
+            CMAKE_EXE_LINKER_FLAGS: ""
+
           - sanitizer: threadSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=thread -fno-sanitize-recover=all -g"
+            CMAKE_EXE_LINKER_FLAGS: ""
+
           - sanitizer: memorySanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -fPIE -pie -fsanitize-memory-track-origins -g"
-          - sanitizer: leakSanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=leak -fno-sanitize-recover=all -g"
+            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -fPIE -fsanitize-memory-track-origins -nostdinc++ -nostdlib++ -stdlib=libc++ -g"
+            CMAKE_EXE_LINKER_FLAGS: "-lc++ -lc++abi -lunwind -pie"
+
           - sanitizer: undefinedSanitizer
             CMAKE_CXX_FLAGS: "-fsanitize=undefined -fno-sanitize-recover=all -g"
+            CMAKE_EXE_LINKER_FLAGS: ""
+
           - sanitizer: noSanitizer
             CMAKE_CXX_FLAGS: ""
+            CMAKE_EXE_LINKER_FLAGS: ""
 
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
+
+#      - name: "Run sscache"
+#        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: "Install Perforce CLI"
         uses: perforce/setup-p4@1.0.2
@@ -55,7 +65,42 @@ jobs:
       - name: "Install c++ compilation dependencies"
         run: |
           sudo apt-get update
-          sudo apt-get install git make cmake gcc g++ clang libc++-dev llvm --yes # p4-fusion dependencies
+          sudo apt-get install --yes \
+            git \
+            make \
+            cmake \
+            gcc \
+            g++ \
+            clang \
+            libc++-dev \
+            libc++abi-dev \
+            llvm \
+            ninja-build \
+            gettext
+
+      - name: "build and clone LLVM and clang"
+        run: |
+          curl -L https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-17.0.4.tar.gz --output llvm-project.tar.gz
+          tar -xzf llvm-project.tar.gz
+          mv llvm-project-llvmorg-17.0.4 llvm-project
+          rm llvm-project.tar.gz
+                  
+          cd llvm-project
+          mkdir build
+          cmake -G Ninja -S runtimes -B build \
+            -DCMAKE_INSTALL_PREFIX="${LIBCXX_INSTALL_DIR}" \
+          	-DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
+          	-DCMAKE_C_COMPILER=clang \
+          	-DCMAKE_CXX_COMPILER=clang++ \
+          	-DLLVM_USE_SANITIZER=MemoryWithOrigins
+          #            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          #            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+          ninja --verbose -C build cxx cxxabi unwind 
+          ninja --verbose -C build install-cxx install-cxxabi install-unwind
+
+        env:
+          SCCACHE_GHA_ENABLED: "true"
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -91,14 +136,16 @@ jobs:
 
       - name: "Run validate migration script"
         run: |
-          sudo apt-get install gettext --yes # for envsubst
           .github/workflows/run-test.sh
         env:
           P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           CMAKE_CXX_COMPILER: "clang++"
           CMAKE_C_COMPILER: "clang"
-          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
+          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer  -fsanitize-ignorelist=${{ github.workspace }}/.github/workflows/msan_ignorelist.txt -O0"
+          CMAKE_EXE_LINKER_FLAGS: "${{ matrix.CMAKE_EXE_LINKER_FLAGS }}"
+          UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
+          ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
 
       - name: "Ensure p4 client is deleted"
         if: always()

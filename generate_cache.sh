@@ -1,8 +1,10 @@
 #!/bin/bash
 
-mkdir build
-cd build
-rm CMakeCache.txt
+cd "$(dirname "${BASH_SOURCE[0]}")"
+set -exo pipefail
+
+mkdir build || true
+rm build/CMakeCache.txt || true
 
 cmakeArgs=(
   -DCMAKE_BUILD_TYPE=$1
@@ -43,4 +45,4 @@ else
 fi
 
 echo "Using CMake arguments: \n${cmakeArgs[@]}"
-cmake .. "${cmakeArgs[@]}"
+cmake -S . -B build "${cmakeArgs[@]}"
