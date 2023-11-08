@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SCRIPT_ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+cd "${SCRIPT_ROOT}/../../.."
+
 set -euxo pipefail
 
 pushd "${OPENSSL_SOURCE_DIR}"
@@ -19,3 +22,5 @@ done
 make "-j$(nproc)"
 
 sudo make install
+
+popd

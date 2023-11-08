@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
-cd "${SCRIPT_ROOT}/../.."
+cd "${SCRIPT_ROOT}/../../.."
 
 export TEMPLATES="${SCRIPT_ROOT}/templates"
 

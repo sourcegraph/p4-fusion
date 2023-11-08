@@ -11,6 +11,7 @@ env:
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
 
   VALGRIND_DOWNLOAD_URL: "https://sourceware.org/pub/valgrind/valgrind-3.22.0.tar.bz2"
+  VALGRIND_INSTALLATION_DIR: "/usr"
   VALGRIND_SOURCE_DIR: "/tmp/valgrind-src"
 
   # Perforce credentials
@@ -28,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tool:
+        tool: # Note: If you add or change the name of tools here, you must also adjust the logic in the "Prepare environment for specific tool" step
           - addressSanitizer
           - threadSanitizer
           - undefinedSanitizer
@@ -40,10 +41,15 @@ jobs:
     steps:
       - name: "Prepare environment for specific tool"
         run: |
-          # Set environment variables based on the tool being used. We can't refer to the matrix variables in the env section
+          # Set environment variables for future steps based on the tool being used. We can't refer to the matrix variables in the env section
           # of the job, so we have to do it here.
+          #
+          # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable 
+          # for more information on the method to set environment variables.
           
           bash <<EOF
+            set -euxo pipefail
+          
             case ${{ matrix.tool }} in
             
             noSanitizer)
@@ -75,9 +81,9 @@ jobs:
             ;;
             esac
           
+            # Set the temporary Perforce client name to use while validating the git migration
             echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" >> $GITHUB_ENV
           EOF
-
 
       - uses: actions/checkout@v2
 
@@ -108,9 +114,10 @@ jobs:
             llvm \
             ninja-build \
             gettext
-          sudo apt remove valgrind --yes
+          sudo apt remove valgrind --yes # remove any existing valgrind installation since we're compiling it from source
 
       - name: "Cache Valgrind source"
+        if: ${{ env.USE_VALGRIND == 'true' }}
         id: cache-valgrind-source
         uses: actions/cache@v2
         with:
@@ -118,7 +125,7 @@ jobs:
           key: ${{ runner.os }}-valgrind--${{ env.VALGRIND_DOWNLOAD_URL }}
 
       - name: "Download Valgrind source"
-        if : ${{ steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
+        if : ${{ env.USE_VALGRIND == 'true' && steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
         run: |
           curl -L "${VALGRIND_DOWNLOAD_URL}" > valgrind.tar.bz2
           mkdir -p "${VALGRIND_SOURCE_DIR}" || true
@@ -128,13 +135,10 @@ jobs:
       - name: "Compile Valgrind"
         if: ${{ env.USE_VALGRIND == 'true' }}
         run: |
-          pushd "${VALGRIND_SOURCE_DIR}"
+          # Note, we need to compile valgrind from source to work around this issue: 
+          # https://bugs.kde.org/show_bug.cgi?id=452758
           
-          ./configure --prefix=/usr
-          make "-j$(nproc)"
-          sudo make install
-          
-          popd
+          .github/workflows/validate-migration-scripts/compile-valgrind.sh
         env:
           CC: "sccache clang"
           CXX: "sccache clang++"
@@ -170,14 +174,14 @@ jobs:
 
       - name: "Compile OpenSSL"
         run: |
-          .github/workflows/compile-openssl.sh
+          .github/workflows/validate-migration-scripts/compile-openssl.sh
         env:
           CC: "sccache clang"
           CXX: "sccache clang++"
 
       - name: "Run validate migration script"
         run: |
-          .github/workflows/run-test.sh
+          .github/workflows/validate-migration-scripts/run-test.sh
         env:
           P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
