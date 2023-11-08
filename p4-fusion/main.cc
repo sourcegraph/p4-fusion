@@ -31,6 +31,9 @@ void shutdown(ThreadPool& pool);
 
 int Main(int argc, char** argv)
 {
+
+    char *x = static_cast<char *>(malloc(100));
+
 	Timer programTimer;
 
 	PRINT("p4-fusion " P4_FUSION_VERSION);
