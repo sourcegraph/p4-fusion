@@ -96,7 +96,7 @@ echo "::group::{Run p4-fusion against the downloaded depot}"
     --noColor true
   )
 
-  if [[ "${VALGRIND:-"false"}" == "true" ]]; then
+  if [[ "${USE_VALGRIND:-"false"}" == "true" ]]; then
     # run p4-fusion under valgrind
     time valgrind \
       --leak-check=full \

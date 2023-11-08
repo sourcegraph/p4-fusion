@@ -34,30 +34,52 @@ jobs:
           - undefinedSanitizer
           - valgrind
           - noSanitizer
-        include:
-          - sanitizer: addressSanitizer
-            VALGRIND: "false"
-            CMAKE_CXX_FLAGS: "-fsanitize=address -fno-sanitize-recover=all -g"
-
-          - sanitizer: threadSanitizer
-            VALGRIND: "false"
-            CMAKE_CXX_FLAGS: "-fsanitize=thread -fno-sanitize-recover=all -g"
-
-          - sanitizer: valgrind
-            VALGRIND: "true"
-            CMAKE_CXX_FLAGS: "-g"
-
-          - sanitizer: undefinedSanitizer
-            VALGRIND: "false"
-            CMAKE_CXX_FLAGS: "-fsanitize=undefined -fno-sanitize-recover=all -g"
-
-          - sanitizer: noSanitizer
-            VALGRIND: "false"
-            CMAKE_CXX_FLAGS: ""
 
     runs-on: ubuntu-latest
 
     steps:
+      - name: "Prepare environment for specific tool"
+        run: |
+          # Set environment variables based on the tool being used. We can't refer to the matrix variables in the env section
+          # of the job, so we have to do it here.
+          
+          bash <<EOF
+            case ${{ matrix.tool }} in
+            
+            noSanitizer)
+              echo "USE_VALGRIND=false" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=" >> $GITHUB_ENV
+            ;;
+          
+            undefinedSanitizer)
+              echo "USE_VALGRIND=false" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-fsanitize=undefined -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+            ;;
+          
+            addressSanitizer)
+              echo "USE_VALGRIND=false" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+            ;;
+          
+            threadSanitizer)
+              echo "USE_VALGRIND=false" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+            ;;
+          
+            valgrind)
+              echo "USE_VALGRIND=true" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
+            ;;
+          
+            addressSanitizer)
+              echo "USE_VALGRIND=false" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+            ;;
+          
+            esac
+          EOF
+
+
       - uses: actions/checkout@v2
 
       - name: "Run sscache"
@@ -105,7 +127,7 @@ jobs:
           rm valgrind.tar.bz2 || true
 
       - name: "Compile Valgrind"
-        if: ${{ matrix.tool == 'valgrind' }}
+        if: ${{ env.USE_VALGRIND == 'true' }}
         run: |
           pushd "${VALGRIND_SOURCE_DIR}"
           
@@ -171,8 +193,7 @@ jobs:
           CMAKE_C_COMPILER: "clang"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
-          VALGRIND: "${{ matrix.VALGRIND }}"
+          CMAKE_CXX_FLAGS: "${{ env.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
           UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
           ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
 
