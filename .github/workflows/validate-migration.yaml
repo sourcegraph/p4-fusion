@@ -8,6 +8,7 @@ env:
   OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
   LIBCXX_INSTALL_DIR: "/tmp/libcxx-install"
+  VALGRIND_VERSION: "3.22.0"
 
   # Perforce credentials
   P4PORT: "perforce.sgdev.org:1666" # the address of the Perforce server to connect to
@@ -24,29 +25,29 @@ jobs:
         sanitizer:
           - addressSanitizer
           - threadSanitizer
-          - memorySanitizer
           - undefinedSanitizer
+          - valgrind
           - noSanitizer
         include:
           - sanitizer: addressSanitizer
+            VALGRIND: "false"
             CMAKE_CXX_FLAGS: "-fsanitize=address -fno-sanitize-recover=all -g"
-            CMAKE_EXE_LINKER_FLAGS: ""
 
           - sanitizer: threadSanitizer
+            VALGRIND: "false"
             CMAKE_CXX_FLAGS: "-fsanitize=thread -fno-sanitize-recover=all -g"
-            CMAKE_EXE_LINKER_FLAGS: ""
 
-          - sanitizer: memorySanitizer
-            CMAKE_CXX_FLAGS: "-fsanitize=memory -fno-sanitize-recover=all -fPIE -fsanitize-memory-track-origins -nostdinc++ -nostdlib++ -stdlib=libc++ -g"
-            CMAKE_EXE_LINKER_FLAGS: "-lc++ -lc++abi -lunwind -pie"
+          - sanitizer: valgrind
+            VALGRIND: "true"
+            CMAKE_CXX_FLAGS: "-g"
 
           - sanitizer: undefinedSanitizer
+            VALGRIND: "false"
             CMAKE_CXX_FLAGS: "-fsanitize=undefined -fno-sanitize-recover=all -g"
-            CMAKE_EXE_LINKER_FLAGS: ""
 
           - sanitizer: noSanitizer
+            VALGRIND: "false"
             CMAKE_CXX_FLAGS: ""
-            CMAKE_EXE_LINKER_FLAGS: ""
 
     runs-on: ubuntu-latest
 
@@ -72,35 +73,26 @@ jobs:
             gcc \
             g++ \
             clang \
+            libc6-dbg \
             libc++-dev \
             libc++abi-dev \
             llvm \
             ninja-build \
             gettext
+          sudo apt remove valgrind --yes
 
-      - name: "build and clone LLVM and clang"
+      - name: "Compile valgrind"
         run: |
-          curl -L https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-17.0.4.tar.gz --output llvm-project.tar.gz
-          tar -xzf llvm-project.tar.gz
-          mv llvm-project-llvmorg-17.0.4 llvm-project
-          rm llvm-project.tar.gz
-                  
-          cd llvm-project
-          mkdir build
-          cmake -G Ninja -S runtimes -B build \
-            -DCMAKE_INSTALL_PREFIX="${LIBCXX_INSTALL_DIR}" \
-          	-DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
-          	-DCMAKE_C_COMPILER=clang \
-          	-DCMAKE_CXX_COMPILER=clang++ \
-          	-DLLVM_USE_SANITIZER=MemoryWithOrigins
-          #            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-          #            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-          ninja --verbose -C build cxx cxxabi unwind 
-          ninja --verbose -C build install-cxx install-cxxabi install-unwind
-
-        env:
-          SCCACHE_GHA_ENABLED: "true"
+          curl -L "https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2" > valgrind.tar.bz2
+          tar -xjf valgrind.tar.bz2
+          pushd "valgrind-${VALGRIND_VERSION}"
+          
+          ./configure --prefix=/usr
+          make "-j$(nproc)"
+          sudo make install
+          
+          popd
+          rm -rf "valgrind-${VALGRIND_VERSION}" valgrind.tar.bz2 || true
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -130,20 +122,25 @@ jobs:
           curl -L "${OPENSSL_DOWNLOAD_URL}" --output openssl.tgz
           tar -C openssl-src -xzf openssl.tgz --strip 1
           pushd openssl-src
+          
           ./config --prefix="${OPENSSL_INSTALL_DIR}" --static
           make install
+          
           popd
 
       - name: "Run validate migration script"
         run: |
+          clang --version
+          valgrind --version
+
           .github/workflows/run-test.sh
         env:
           P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           CMAKE_CXX_COMPILER: "clang++"
           CMAKE_C_COMPILER: "clang"
-          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer  -fsanitize-ignorelist=${{ github.workspace }}/.github/workflows/msan_ignorelist.txt -O0"
-          CMAKE_EXE_LINKER_FLAGS: "${{ matrix.CMAKE_EXE_LINKER_FLAGS }}"
+          CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
+          VALGRIND: ${{ matrix.VALGRIND }}
           UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
           ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
 

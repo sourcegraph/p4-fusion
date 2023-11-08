@@ -78,24 +78,40 @@ echo "::endgroup::"
 
 echo "::group::{Run p4-fusion against the downloaded depot}"
 {
-  time ./build/p4-fusion/p4-fusion \
-    --path "//${DEPOT_NAME}/..." \
-    --client "${P4CLIENT}" \
-    --user "$P4USER" \
-    --src "${GIT_DEPOT_DIR}" \
-    --networkThreads 64 \
-    --port "${P4PORT}" \
-    --lookAhead 15000 \
-    --printBatch 1000 \
-    --noBaseCommit true \
-    --retries 10 \
-    --refresh 1000 \
-    --maxChanges -1 \
-    --includeBinaries true \
-    --fsyncEnable true \
-    --noColor true 2>&1 | tee "${P4_FUSION_LOG}"
+  P4_FUSION_ARGS=(
+    --path "//${DEPOT_NAME}/..."
+    --client "${P4CLIENT}"
+    --user "$P4USER"
+    --src "${GIT_DEPOT_DIR}"
+    --networkThreads 64
+    --port "${P4PORT}"
+    --lookAhead 15000
+    --printBatch 1000
+    --noBaseCommit true
+    --retries 10
+    --refresh 1000
+    --maxChanges -1
+    --includeBinaries true
+    --fsyncEnable true
+    --noColor true
+  )
 
+  if [[ "${VALGRIND:-"false"}" == "true" ]]; then
+    # run p4-fusion under valgrind
+    time valgrind \
+      --leak-check=full \
+      --show-leak-kinds=all \
+      --track-origins=yes \
+      --fair-sched=yes \
+      --error-exitcode=99 \
+      --verbose \
+      ./build/p4-fusion/p4-fusion "${P4_FUSION_ARGS[@]}" | tee "${P4_FUSION_LOG}"
+  else
+    # run p4-fusion normally
+    time ./build/p4-fusion/p4-fusion "${P4_FUSION_ARGS[@]}" | tee "${P4_FUSION_LOG}"
+  fi
 }
+
 echo "::endgroup::"
 
 echo "::group::{Run validation on migrated data}"
