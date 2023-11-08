@@ -44,5 +44,19 @@ else
   )
 fi
 
+# set the compiler launcher if it is set
+
+if [[ -n "$CMAKE_C_COMPILER_LAUNCHER" ]]; then
+  cmakeArgs+=(
+    -DCMAKE_C_COMPILER_LAUNCHER="$CMAKE_C_COMPILER_LAUNCHER"
+  )
+fi
+
+if [[ -n "$CMAKE_CXX_COMPILER_LAUNCHER" ]]; then
+  cmakeArgs+=(
+    -DCMAKE_CXX_COMPILER_LAUNCHER="$CMAKE_CXX_COMPILER_LAUNCHER"
+  )
+fi
+
 echo "Using CMake arguments: \n${cmakeArgs[@]}"
 cmake -S . -B build "${cmakeArgs[@]}"

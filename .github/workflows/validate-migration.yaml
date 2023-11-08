@@ -5,10 +5,13 @@ on: [ push ]
 env:
   # Constants
   P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
+
   OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
+  OPENSSL_SOURCE_DIR: "/tmp/openssl-src"
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
-  LIBCXX_INSTALL_DIR: "/tmp/libcxx-install"
-  VALGRIND_VERSION: "3.22.0"
+
+  VALGRIND_DOWNLOAD_URL: "https://sourceware.org/pub/valgrind/valgrind-3.22.0.tar.bz2"
+  VALGRIND_SOURCE_DIR: "/tmp/valgrind-src"
 
   # Perforce credentials
   P4PORT: "perforce.sgdev.org:1666" # the address of the Perforce server to connect to
@@ -17,12 +20,15 @@ env:
 
   DEPOT_NAME: "source/src-cli" # the name of the Perforce depot to validate the git migration against
 
+  # Enable sccache
+  SCCACHE_GHA_ENABLED: "true"
+
 jobs:
   validate-migration:
     strategy:
       fail-fast: false
       matrix:
-        sanitizer:
+        tool:
           - addressSanitizer
           - threadSanitizer
           - undefinedSanitizer
@@ -54,8 +60,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-#      - name: "Run sscache"
-#        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: "Run sscache"
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.6.0"
 
       - name: "Install Perforce CLI"
         uses: perforce/setup-p4@1.0.2
@@ -81,18 +89,34 @@ jobs:
             gettext
           sudo apt remove valgrind --yes
 
-      - name: "Compile valgrind"
+      - name: "Cache Valgrind source"
+        id: cache-valgrind-source
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.VALGRIND_SOURCE_DIR }}
+          key: ${{ runner.os }}-valgrind--${{ env.VALGRIND_DOWNLOAD_URL }}
+
+      - name: "Download Valgrind source"
+        if : ${{ steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
         run: |
-          curl -L "https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2" > valgrind.tar.bz2
-          tar -xjf valgrind.tar.bz2
-          pushd "valgrind-${VALGRIND_VERSION}"
+          curl -L "${VALGRIND_DOWNLOAD_URL}" > valgrind.tar.bz2
+          mkdir -p "${VALGRIND_SOURCE_DIR}" || true
+          tar -C "${VALGRIND_SOURCE_DIR}" -xjf valgrind.tar.bz2 --strip-components 1
+          rm valgrind.tar.bz2 || true
+
+      - name: "Compile Valgrind"
+        if: ${{ matrix.tool == 'valgrind' }}
+        run: |
+          pushd "${VALGRIND_SOURCE_DIR}"
           
           ./configure --prefix=/usr
           make "-j$(nproc)"
           sudo make install
           
           popd
-          rm -rf "valgrind-${VALGRIND_VERSION}" valgrind.tar.bz2 || true
+        env:
+          CC: "sccache gcc"
+          CXX: "sccache gcc"
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -108,39 +132,47 @@ jobs:
           mkdir -p vendor/helix-core-api/linux
           tar -C vendor/helix-core-api/linux -xzf p4.tgz --strip 1
 
-      - name: "Cache OpenSSL"
+      - name: "Cache OpenSSL source"
+        id: cache-openssl-source
         uses: actions/cache@v2
-        id: cache-openssl
         with:
-          path: ${{ env.OPENSSL_INSTALL_DIR }}
-          key: ${{ runner.os }}-openssl-${{ env.OPENSSL_DOWNLOAD_URL }}
+          path: ${{ env.OPENSSL_SOURCE_DIR }}
+          key: ${{ runner.os }}-openssl-source-${{ env.OPENSSL_DOWNLOAD_URL }}
+
+      - name: "Download OpenSSL source"
+        if : ${{ steps.cache-openssl-source.outputs.cache-hit != 'true' }}
+        run: |
+          curl -L "${OPENSSL_DOWNLOAD_URL}" --output openssl.tgz
+          mkdir -p "${OPENSSL_SOURCE_DIR}" || true
+          tar -C "${OPENSSL_SOURCE_DIR}" -xzf openssl.tgz --strip-components 1
+          rm openssl.tgz || true
 
       - name: "Compile OpenSSL"
-        if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-openssl-install.outputs.cache-hit != 'true' }}
         run: |
-          mkdir openssl-src
-          curl -L "${OPENSSL_DOWNLOAD_URL}" --output openssl.tgz
-          tar -C openssl-src -xzf openssl.tgz --strip 1
-          pushd openssl-src
+          pushd "${OPENSSL_SOURCE_DIR}"
           
           ./config --prefix="${OPENSSL_INSTALL_DIR}" --static
-          make install
+          make "-j$(nproc)"
+          sudo make install
           
           popd
+        env:
+          CC: "sccache gcc"
+          CXX: "sccache gcc"
 
       - name: "Run validate migration script"
         run: |
-          clang --version
-          valgrind --version
-
           .github/workflows/run-test.sh
         env:
-          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}" # the temporary Perforce client name to use while validating the git migration
+          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           CMAKE_CXX_COMPILER: "clang++"
           CMAKE_C_COMPILER: "clang"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_FLAGS: "${{ matrix.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
-          VALGRIND: ${{ matrix.VALGRIND }}
+          VALGRIND: "${{ matrix.VALGRIND }}"
           UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
           ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
 
@@ -149,4 +181,4 @@ jobs:
         run: |
           p4 client -f -Fs -d "${P4CLIENT}" || true
         env:
-          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.sanitizer }}"
+          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}"
