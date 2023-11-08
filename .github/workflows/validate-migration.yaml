@@ -77,6 +77,8 @@ jobs:
             ;;
           
             esac
+          
+            echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" >> $GITHUB_ENV
           EOF
 
 
@@ -201,5 +203,4 @@ jobs:
         if: always()
         run: |
           p4 client -f -Fs -d "${P4CLIENT}" || true
-        env:
-          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}"
+        
