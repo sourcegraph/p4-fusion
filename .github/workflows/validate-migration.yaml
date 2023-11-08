@@ -54,28 +54,25 @@ jobs:
             undefinedSanitizer)
               echo "USE_VALGRIND=false" >> $GITHUB_ENV
               echo "CMAKE_CXX_FLAGS=-fsanitize=undefined -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+              echo "OPENSSL_FLAGS=-fsanitize=undefined -fno-sanitize-recover=all -g" >> $GITHUB_ENV
             ;;
           
             addressSanitizer)
               echo "USE_VALGRIND=false" >> $GITHUB_ENV
               echo "CMAKE_CXX_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+              echo "OPENSSL_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
             ;;
           
             threadSanitizer)
               echo "USE_VALGRIND=false" >> $GITHUB_ENV
               echo "CMAKE_CXX_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
+              echo "OPENSSL_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
             ;;
           
             valgrind)
               echo "USE_VALGRIND=true" >> $GITHUB_ENV
               echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
             ;;
-          
-            addressSanitizer)
-              echo "USE_VALGRIND=false" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-            ;;
-          
             esac
           
             echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" >> $GITHUB_ENV
@@ -139,8 +136,8 @@ jobs:
           
           popd
         env:
-          CC: "sccache gcc"
-          CXX: "sccache gcc"
+          CC: "sccache clang"
+          CXX: "sccache clang++"
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -172,18 +169,11 @@ jobs:
           rm openssl.tgz || true
 
       - name: "Compile OpenSSL"
-        if: ${{ steps.cache-openssl-install.outputs.cache-hit != 'true' }}
         run: |
-          pushd "${OPENSSL_SOURCE_DIR}"
-          
-          ./config --prefix="${OPENSSL_INSTALL_DIR}" --static
-          make "-j$(nproc)"
-          sudo make install
-          
-          popd
+          .github/workflows/compile-openssl.sh
         env:
-          CC: "sccache gcc"
-          CXX: "sccache gcc"
+          CC: "sccache clang"
+          CXX: "sccache clang++"
 
       - name: "Run validate migration script"
         run: |
@@ -203,4 +193,3 @@ jobs:
         if: always()
         run: |
           p4 client -f -Fs -d "${P4CLIENT}" || true
-        
