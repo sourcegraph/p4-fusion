@@ -29,15 +29,8 @@
 
 void shutdown(ThreadPool& pool);
 
-void *p;
-
 int Main(int argc, char** argv)
 {
-
-    char *x = new char[100];
-    p = malloc(7);
-    p = 0; // The memory is leaked here.
-
 	Timer programTimer;
 
 	PRINT("p4-fusion " P4_FUSION_VERSION);
