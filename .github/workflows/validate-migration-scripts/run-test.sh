@@ -52,6 +52,7 @@ Try using 'p4 -u ${P4USER} login -a' to generate a session ticket.
 See '${handbook_link}' for more information.
 END
 
+  exit 1
   fi
 }
 
