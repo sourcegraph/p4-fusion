@@ -95,6 +95,15 @@ jobs:
       
           {
             # Set the flags for compiling C++
+            # 
+            # Note: Valgrind's documentation recommends compiling with -O0 to avoid compiler optimizations that can 
+            # lead to inaccurate line numbers. However, we've found that compiling with -O1 is much faster (~2x) and 
+            # "should work fairly well" according to the Valgrind documentation.
+            # 
+            # If you're getting inaccurate line numbers, try tweaking the optimization level to -O0 to see 
+            # that helps. 
+            #
+            # See https://valgrind.org/docs/manual/quick-start.html#quick-start.prepare for more information.
             echo "CMAKE_CXX_FLAGS=-stdlib=libc++ -fno-omit-frame-pointer -g -O1 ${CMAKE_CXX_FLAGS:-""}"
 
             # Set the flags for compiling Valgrind
