@@ -258,9 +258,9 @@ jobs:
           
           EOF
 
-      - name: "Run validate migration script"
+      - name: "Build P4 Fusion and run validate migration script"
         run: |
-          .github/workflows/validate-migration-scripts/run-test.sh
+          .github/workflows/validate-migration-scripts/build-p4-fusion-and-run-validate-migration.sh
         env:
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           USE_VALGRIND: ${{ env.VALGRIND_FLAGS != '' }}
