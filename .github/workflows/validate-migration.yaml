@@ -101,7 +101,7 @@ jobs:
       
           {
             # Set the flags for compiling C++
-            echo "CMAKE_CXX_FLAGS=-stdlib=libc++ -fno-omit-frame-pointer -g -O0 ${CMAKE_CXX_FLAGS:-""}"
+            echo "CMAKE_CXX_FLAGS=-stdlib=libc++ -fno-omit-frame-pointer -g -O1 ${CMAKE_CXX_FLAGS:-""}"
 
             # Set the flags for compiling Valgrind
             echo "VALGRIND_FLAGS=${VALGRIND_FLAGS:-""}"
