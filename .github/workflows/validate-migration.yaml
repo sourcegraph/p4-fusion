@@ -41,9 +41,8 @@ jobs:
       fail-fast: false
       matrix:
         tool: # Note: If you add or change the name of tools here, you must also adjust the logic in the "Prepare environment for specific tool" step
-          - addressSanitizer # https://github.com/google/sanitizers/wiki/AddressSanitizer
+          - addressAndUndefinedSanitizer # https://github.com/google/sanitizers/wiki/AddressSanitizer and https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
           - threadSanitizer # https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
-          - undefinedSanitizer # https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
           - valgrindMemcheck # https://valgrind.org/info/tools.html#memcheck
           - valgrindHelgrind # https://valgrind.org/info/tools.html#helgrind
           - noTool
@@ -68,15 +67,10 @@ jobs:
           noTool)
             # No tool is being used, so we don't need to set any flags
           ;;
-        
-          undefinedSanitizer)
-           OPENSSL_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
-           CMAKE_CXX_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
-          ;;
-        
-          addressSanitizer)
-            OPENSSL_FLAGS="-fsanitize=address -fno-sanitize-recover=all"
-            CMAKE_CXX_FLAGS="-fsanitize=address -fno-sanitize-recover=all"
+              
+          addressAndUndefinedSanitizer)
+            OPENSSL_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all"
+            CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all"
           ;;
         
           threadSanitizer)
