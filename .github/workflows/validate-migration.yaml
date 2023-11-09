@@ -2,6 +2,10 @@ name: validate-migration
 
 on: [ push ]
 
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 env:
   # Setup: Constants for downloading and compiling dependencies
   P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
