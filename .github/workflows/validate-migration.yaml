@@ -30,10 +30,11 @@ jobs:
       fail-fast: false
       matrix:
         tool: # Note: If you add or change the name of tools here, you must also adjust the logic in the "Prepare environment for specific tool" step
-          - addressSanitizer
-          - threadSanitizer
-          - undefinedSanitizer
-          - valgrind
+          - addressSanitizer # https://github.com/google/sanitizers/wiki/AddressSanitizer
+          - threadSanitizer # https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
+          - undefinedSanitizer # https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+          - valgrindMemcheck # https://valgrind.org/info/tools.html#memcheck
+          - valgrindHelgrind # https://valgrind.org/info/tools.html#helgrind
           - noSanitizer
 
     runs-on: ubuntu-latest
@@ -75,10 +76,23 @@ jobs:
               echo "OPENSSL_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
             ;;
           
-            valgrind)
+            valgrindMemcheck)
               echo "USE_VALGRIND=true" >> $GITHUB_ENV
               echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
+              echo "VALGRIND_FLAGS=--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes" >> $GITHUB_ENV
             ;;
+          
+            valgrindHelgrind)
+              echo "USE_VALGRIND=true" >> $GITHUB_ENV
+              echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
+              echo "VALGRIND_FLAGS=--tool=helgrind --track-lockorders=yes --history-level=full" >> $GITHUB_ENV
+            ;;
+          
+            *)
+              echo "Unknown tool: ${{ matrix.tool }}"
+              exit 1
+            ;;
+          
             esac
           
             # Set the temporary Perforce client name to use while validating the git migration
@@ -189,7 +203,7 @@ jobs:
           CMAKE_C_COMPILER: "clang"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_FLAGS: "${{ env.CMAKE_CXX_FLAGS }} -fno-omit-frame-pointer -O0"
+          CMAKE_CXX_FLAGS: "${{ env.CMAKE_CXX_FLAGS }} -stdlib=libc++ -fno-omit-frame-pointer -O0"
           UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
           ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
 

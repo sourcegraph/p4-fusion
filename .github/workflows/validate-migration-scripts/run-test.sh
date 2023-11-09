@@ -98,14 +98,22 @@ echo "::group::{Run p4-fusion against the downloaded depot}"
 
   if [[ "${USE_VALGRIND:-"false"}" == "true" ]]; then
     # run p4-fusion under valgrind
-    time valgrind \
-      --leak-check=full \
-      --show-leak-kinds=all \
-      --track-origins=yes \
-      --fair-sched=yes \
-      --error-exitcode=99 \
-      --verbose \
-      ./build/p4-fusion/p4-fusion "${P4_FUSION_ARGS[@]}" | tee "${P4_FUSION_LOG}"
+
+    VALGRIND_ARGS=(
+      --fair-sched=yes    # see https://valgrind.org/docs/manual/manual-core.html#manual-core.pthreads: unsure if this makes much of a difference in pratice
+      --error-exitcode=99 # tell valgrind to exit if it finds an issue
+      --verbose
+    )
+
+    # fill in extra flags provided by action runner
+    read -r -a extra_valgrind_args <<<"${VALGRIND_FLAGS:-}"
+    for flag in "${extra_valgrind_args[@]}"; do
+      if [[ -n "${flag}" ]]; then
+        VALGRIND_ARGS+=("$flag")
+      fi
+    done
+
+    time valgrind "${VALGRIND_ARGS[@]}" ./build/p4-fusion/p4-fusion "${P4_FUSION_ARGS[@]}" | tee "${P4_FUSION_LOG}"
   else
     # run p4-fusion normally
     time ./build/p4-fusion/p4-fusion "${P4_FUSION_ARGS[@]}" | tee "${P4_FUSION_LOG}"
