@@ -44,8 +44,6 @@ else
   )
 fi
 
-# set the compiler launcher if it is set
-
 if [[ -n "$CMAKE_C_COMPILER_LAUNCHER" ]]; then
   cmakeArgs+=(
     -DCMAKE_C_COMPILER_LAUNCHER="$CMAKE_C_COMPILER_LAUNCHER"
