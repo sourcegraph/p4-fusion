@@ -3,7 +3,7 @@ name: validate-migration
 on: [ push ]
 
 env:
-  # Constants
+  # Setup: Constants for downloading and compiling dependencies
   P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
 
   OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
@@ -14,15 +14,26 @@ env:
   VALGRIND_INSTALLATION_DIR: "/usr"
   VALGRIND_SOURCE_DIR: "/tmp/valgrind-src"
 
-  # Perforce credentials
+  # Setup: Perforce credentials
   P4PORT: "perforce.sgdev.org:1666" # the address of the Perforce server to connect to
   P4USER: "admin" # the name of the Perforce user
   P4PASSWD: ${{ secrets.P4PASSWD }} # the ticket for the Perforce user
 
-  DEPOT_NAME: "source/src-cli" # the name of the Perforce depot to validate the git migration against
-
-  # Enable sccache
+  # Setup: Enable sccache for faster builds
   SCCACHE_GHA_ENABLED: "true"
+  CC: "sccache clang"
+  CXX: "sccache clang++"
+  CMAKE_C_COMPILER_LAUNCHER: "sccache"
+  CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+  CMAKE_CXX_COMPILER: "clang++"
+  CMAKE_C_COMPILER: "clang"
+
+  # Setup: Sanitizer flags
+  UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
+  ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
+
+  # Test: Input parameters to the validate-migration test script
+  DEPOT_NAME: "source/src-cli" # the name of the Perforce depot to validate the git migration against
 
 jobs:
   validate-migration:
@@ -35,7 +46,7 @@ jobs:
           - undefinedSanitizer # https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
           - valgrindMemcheck # https://valgrind.org/info/tools.html#memcheck
           - valgrindHelgrind # https://valgrind.org/info/tools.html#helgrind
-          - noSanitizer
+          - noTool
 
     runs-on: ubuntu-latest
 
@@ -48,55 +59,60 @@ jobs:
           # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable 
           # for more information on the method to set environment variables.
           
-          bash <<EOF
-            set -euxo pipefail
+          bash <<"EOF"
           
-            case ${{ matrix.tool }} in
-            
-            noSanitizer)
-              echo "USE_VALGRIND=false" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=" >> $GITHUB_ENV
-            ;;
+          set -euxo pipefail
+        
+          case ${{ matrix.tool }} in
           
-            undefinedSanitizer)
-              echo "USE_VALGRIND=false" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-fsanitize=undefined -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-              echo "OPENSSL_FLAGS=-fsanitize=undefined -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-            ;;
-          
-            addressSanitizer)
-              echo "USE_VALGRIND=false" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-              echo "OPENSSL_FLAGS=-fsanitize=address -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-            ;;
-          
-            threadSanitizer)
-              echo "USE_VALGRIND=false" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-              echo "OPENSSL_FLAGS=-fsanitize=thread -fno-sanitize-recover=all -g" >> $GITHUB_ENV
-            ;;
-          
-            valgrindMemcheck)
-              echo "USE_VALGRIND=true" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
-              echo "VALGRIND_FLAGS=--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes" >> $GITHUB_ENV
-            ;;
-          
-            valgrindHelgrind)
-              echo "USE_VALGRIND=true" >> $GITHUB_ENV
-              echo "CMAKE_CXX_FLAGS=-g" >> $GITHUB_ENV
-              echo "VALGRIND_FLAGS=--tool=helgrind --track-lockorders=yes --history-level=full" >> $GITHUB_ENV
-            ;;
-          
-            *)
-              echo "Unknown tool: ${{ matrix.tool }}"
-              exit 1
-            ;;
-          
-            esac
-          
+          noTool)
+            # No tool is being used, so we don't need to set any flags
+          ;;
+        
+          undefinedSanitizer)
+           OPENSSL_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
+           CMAKE_CXX_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
+          ;;
+        
+          addressSanitizer)
+            OPENSSL_FLAGS="-fsanitize=address -fno-sanitize-recover=all"
+            CMAKE_CXX_FLAGS="-fsanitize=address -fno-sanitize-recover=all"
+          ;;
+        
+          threadSanitizer)
+            OPENSSL_FLAGS="-fsanitize=thread -fno-sanitize-recover=all"
+            CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all"
+          ;;
+        
+          valgrindMemcheck)
+            VALGRIND_FLAGS="--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes"
+          ;;
+        
+          valgrindHelgrind)
+            VALGRIND_FLAGS="--tool=helgrind --track-lockorders=yes --history-level=full" 
+          ;;
+        
+          *)
+            echo "Unknown tool: ${{ matrix.tool }}"
+            exit 1
+          ;;
+        
+          esac
+      
+          {
+            # Set the flags for compiling C++
+            echo "CMAKE_CXX_FLAGS=-stdlib=libc++ -fno-omit-frame-pointer -g -O0 ${CMAKE_CXX_FLAGS:-""}"
+
+            # Set the flags for compiling Valgrind
+            echo "VALGRIND_FLAGS=${VALGRIND_FLAGS:-""}"
+
+            # Set the flags for compiling OpenSSL
+            echo "OPENSSL_FLAGS=${OPENSSL_FLAGS:-""}"
+
             # Set the temporary Perforce client name to use while validating the git migration
-            echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" >> $GITHUB_ENV
+            echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}"
+          } >>"$GITHUB_ENV"
+            
           EOF
 
       - uses: actions/checkout@v2
@@ -112,26 +128,42 @@ jobs:
           command: "help"
           p4_version: 23.1
 
-      - name: "Install c++ compilation dependencies"
+      - name: "Install APT package dependencies"
         run: |
+          bash <<"EOF"
+          
+          set -euxo pipefail
+        
+          PACKAGES=(
+            # C++ compilation dependencies
+            git
+            make
+            cmake
+            gcc 
+            g++ 
+            clang
+            libc6-dbg
+            libc++-dev
+            libc++abi-dev
+            ninja-build
+        
+            # For llvm-symbolizer for symbolizing stack traces
+            llvm
+            
+            # For envsubst in the run-test.sh script
+            gettext # for envsubst
+          )
+        
           sudo apt-get update
-          sudo apt-get install --yes \
-            git \
-            make \
-            cmake \
-            gcc \
-            g++ \
-            clang \
-            libc6-dbg \
-            libc++-dev \
-            libc++abi-dev \
-            llvm \
-            ninja-build \
-            gettext
-          sudo apt remove valgrind --yes # remove any existing valgrind installation since we're compiling it from source
+          sudo apt-get install --yes "${PACKAGES[@]}"
+          
+          # remove any existing Valgrind installation since we're compiling it from source
+          sudo apt remove valgrind --yes
+          
+          EOF
 
       - name: "Cache Valgrind source"
-        if: ${{ env.USE_VALGRIND == 'true' }}
+        if: ${{ env.VALGRIND_FLAGS != '' }}
         id: cache-valgrind-source
         uses: actions/cache@v2
         with:
@@ -139,7 +171,7 @@ jobs:
           key: ${{ runner.os }}-valgrind--${{ env.VALGRIND_DOWNLOAD_URL }}
 
       - name: "Download Valgrind source"
-        if : ${{ env.USE_VALGRIND == 'true' && steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
+        if : ${{ env.VALGRIND_FLAGS != '' && steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
         run: |
           curl -L "${VALGRIND_DOWNLOAD_URL}" > valgrind.tar.bz2
           mkdir -p "${VALGRIND_SOURCE_DIR}" || true
@@ -147,15 +179,24 @@ jobs:
           rm valgrind.tar.bz2 || true
 
       - name: "Compile Valgrind"
-        if: ${{ env.USE_VALGRIND == 'true' }}
+        if: ${{ env.VALGRIND_FLAGS != '' }}
         run: |
           # Note, we need to compile valgrind from source to work around this issue: 
           # https://bugs.kde.org/show_bug.cgi?id=452758
           
-          .github/workflows/validate-migration-scripts/compile-valgrind.sh
-        env:
-          CC: "sccache clang"
-          CXX: "sccache clang++"
+          bash <<"EOF"
+          
+          set -euxo pipefail
+          
+          pushd "${VALGRIND_SOURCE_DIR}"
+  
+          ./configure --prefix="${VALGRIND_INSTALLATION_DIR}"
+          make --jobs="$(nproc)"
+          sudo make install
+          
+          popd
+          
+          EOF
 
       - name: "Cache Perforce API headers"
         id: cache-p4api
@@ -188,24 +229,38 @@ jobs:
 
       - name: "Compile OpenSSL"
         run: |
-          .github/workflows/validate-migration-scripts/compile-openssl.sh
-        env:
-          CC: "sccache clang"
-          CXX: "sccache clang++"
+          bash <<"EOF"
+          
+          set -euxo pipefail 
+          
+          pushd "${OPENSSL_SOURCE_DIR}"
+  
+          CONFIG_ARGS=(
+            --prefix="${OPENSSL_INSTALL_DIR}"
+          )
+          
+          read -r -a array <<<"${OPENSSL_FLAGS:-}"
+          for flag in "${array[@]}"; do
+            if [[ -n "${flag}" ]]; then
+              CONFIG_ARGS+=("$flag")
+            fi
+          done
+          
+          ./config "${CONFIG_ARGS[@]}"
+          make --jobs="$(nproc)"
+          
+          sudo make install
+          
+          popd
+          
+          EOF
 
       - name: "Run validate migration script"
         run: |
           .github/workflows/validate-migration-scripts/run-test.sh
         env:
-          P4CLIENT: "validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}" # the temporary Perforce client name to use while validating the git migration
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
-          CMAKE_CXX_COMPILER: "clang++"
-          CMAKE_C_COMPILER: "clang"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_FLAGS: "${{ env.CMAKE_CXX_FLAGS }} -stdlib=libc++ -fno-omit-frame-pointer -O0"
-          UBSAN_OPTIONS: "print_stacktrace=1" # print stack trace on undefined behavior
-          ASAN_OPTIONS: "check_initialization_order=1" # check initialization order of globals
+          USE_VALGRIND: ${{ env.VALGRIND_FLAGS != '' }}
 
       - name: "Ensure p4 client is deleted"
         if: always()
