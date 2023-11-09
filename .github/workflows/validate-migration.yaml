@@ -268,4 +268,4 @@ jobs:
       - name: "Ensure p4 client is deleted"
         if: always()
         run: |
-          p4 client -f -Fs -d "${P4CLIENT}" || true
+          timeout 30 p4 client -f -Fs -d "${P4CLIENT}" || true
