@@ -9,6 +9,7 @@ set -euxo pipefail
 
 export P4USER="${P4USER:-"admin"}"                   # the name of the Perforce superuser that the script will use to create the depot
 export P4PORT="${P4PORT:-"perforce.sgdev.org:1666"}" # the address of the Perforce server to connect to
+export P4PASSWD
 
 export DEPOT_NAME="${DEPOT_NAME:-"source/src-cli"}"      # the name of the depot that the script will create on the server
 export P4CLIENT="${P4CLIENT:-"integration-test-client"}" # the name of the temporary client that the script will use while it creates the depot
