@@ -42,8 +42,6 @@ set(REGEX_BACKEND "Regex backend" "builtin")
 set(CXX_STANDARD_REQUIRED true)
 set(CMAKE_CXX_STANDARD 11)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
-
 set(CMAKE_C_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
@@ -70,6 +68,6 @@ add_subdirectory(vendor)
 add_subdirectory(p4-fusion)
 
 if (BUILD_TESTS)
-    message(STATUS "Building tests ")
+    message(STATUS "Building tests")
     add_subdirectory(tests)
 endif ()
