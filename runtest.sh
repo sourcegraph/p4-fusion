@@ -33,7 +33,7 @@
 
 set -euo pipefail
 
-ROOT="$(dirname "$(realpath "$0")")"
+ROOT="$(dirname "${BASH_SOURCE[0]}")"
 
 rm -f "${ROOT}/verify/p4fusion.log"
 rm -rf "${ROOT}/verify/gitout"
