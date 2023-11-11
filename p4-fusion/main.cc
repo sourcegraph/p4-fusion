@@ -346,13 +346,13 @@ int Main(int argc, char** argv)
 			}
 
 			const std::string& commitSHA = git.WriteChangelistBranch(
-				    depotPath,
-				    cl,
-				    branchGroup.files,
-				    branchGroup.targetBranch,
-				    fullName,
-				    email,
-				    mergeFrom);
+			    depotPath,
+			    cl,
+			    branchGroup.files,
+			    branchGroup.targetBranch,
+			    fullName,
+			    email,
+			    mergeFrom);
 
 			// For scripting/testing purposes...
 			PRINT("COMMIT:" << commitSHA << ":" << cl.number << ":" << branchGroup.targetBranch << ":")

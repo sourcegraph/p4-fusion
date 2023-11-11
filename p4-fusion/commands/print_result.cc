@@ -8,32 +8,19 @@
 
 #include <utility>
 
-void PrintResult::PrintResultIterator::OnStat()
-{
-	// Noop.
-}
-
-void PrintResult::PrintResultIterator::OnOutput(const char*, int)
-{
-	// Noop.
-}
-
-PrintResult::PrintResult(std::shared_ptr<PrintResult::PrintResultIterator> _it)
-    : it(_it)
-{
-}
+PrintResult::PrintResult(std::function<void()> stat, std::function<void(const char*, int)> out): onStat(std::move(stat)),onOutput(std::move(out)) {}
 
 void PrintResult::OutputStat(StrDict* varList)
 {
-	it->OnStat();
+	onStat();
 }
 
 void PrintResult::OutputText(const char* data, int length)
 {
-	it->OnOutput(data, length);
+	onOutput(data, length);
 }
 
 void PrintResult::OutputBinary(const char* data, int length)
 {
-	it->OnOutput(data, length);
+	OutputText(data, length);
 }

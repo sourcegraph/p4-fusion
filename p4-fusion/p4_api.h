@@ -63,7 +63,7 @@ public:
 	ChangesResult Changes(const std::string& path, const std::string& from, int32_t maxCount);
 	DescribeResult Describe(GitAPI& git, int cl);
 	FileLogResult FileLog(GitAPI& git, const int changelist);
-	PrintResult PrintFiles(const std::vector<std::string>& fileRevisions, PrintResult::PrintResultIterator&& it);
+	PrintResult PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput);
 	ClientResult Client();
 	UsersResult Users();
 	InfoResult Info();
