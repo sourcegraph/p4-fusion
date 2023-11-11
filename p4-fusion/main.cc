@@ -84,8 +84,10 @@ int Main(int argc, char** argv)
 	P4API::P4PORT = arguments.GetPort();
 	P4API::P4USER = arguments.GetUsername();
 
+	P4API p4;
+
 	{
-		TestResult serviceConnectionResult = P4API().TestConnection(5);
+		TestResult serviceConnectionResult = p4.TestConnection(5);
 		if (serviceConnectionResult.HasError())
 		{
 			ERR("Error occurred while connecting to " << P4API::P4PORT << ": " << serviceConnectionResult.PrintError())
@@ -97,7 +99,7 @@ int Main(int argc, char** argv)
 
 	{
 		P4API::P4CLIENT = arguments.GetClient();
-		ClientResult clientRes = P4API().Client();
+		ClientResult clientRes = p4.Client();
 		if (clientRes.HasError())
 		{
 			ERR("Error occurred while fetching client spec: " + clientRes.PrintError())
@@ -113,8 +115,6 @@ int Main(int argc, char** argv)
 
 		PRINT("Updated client workspace view " << P4API::ClientSpec.client << " with " << P4API::ClientSpec.mapping.size() << " mappings")
 	}
-
-	P4API p4;
 
 	int timezoneMinutes;
 	{
