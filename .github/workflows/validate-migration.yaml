@@ -27,11 +27,11 @@ env:
   P4PASSWD: ${{ secrets.P4PASSWD }} # the ticket for the Perforce user
 
   # Setup: Enable sccache for faster builds
-#  SCCACHE_GHA_ENABLED: "true"
+  SCCACHE_GHA_ENABLED: "true"
   CC: "clang"
   CXX: "clang++"
-#  CMAKE_C_COMPILER_LAUNCHER: "sccache"
-#  CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+  CMAKE_C_COMPILER_LAUNCHER: "sccache"
+  CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
   CMAKE_CXX_COMPILER: "clang++"
   CMAKE_C_COMPILER: "clang"
 
@@ -127,10 +127,10 @@ jobs:
 
       - uses: actions/checkout@v2
 
-#      - name: "Run sscache"
-#        uses: mozilla-actions/sccache-action@v0.0.3
-#        with:
-#          version: "v0.6.0"
+      - name: "Run sscache"
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.6.0"
 
       - name: "Install Perforce CLI"
         uses: perforce/setup-p4@1.0.2
