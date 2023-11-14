@@ -19,7 +19,7 @@ env:
   VALGRIND_SOURCE_DIR: "/tmp/valgrind-src"
 
   # Setup: Perforce credentials
-  P4PORT: "perforce.sgdev.org:1666" # the address of the Perforce server to connect to
+  P4PORT: "ssl:perforce.sgdev.org:1666" # the address of the Perforce server to connect to
   P4USER: "admin" # the name of the Perforce user
   P4PASSWD: ${{ secrets.P4PASSWD }} # the ticket for the Perforce user
 
