@@ -132,7 +132,7 @@ jobs:
       - name: "Install Perforce CLI"
         uses: perforce/setup-p4@1.0.2
         with:
-          command: "help"
+          command: "trust -y -f"
           p4_version: 23.1
 
       - name: "Install APT package dependencies"
