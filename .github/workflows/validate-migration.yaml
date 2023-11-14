@@ -9,14 +9,17 @@ concurrency:
 env:
   # Setup: Constants for downloading and compiling dependencies
   P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
+  P4_DOWNLOAD_DIR: "/tmp/p4-download"
 
   OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
   OPENSSL_SOURCE_DIR: "/tmp/openssl-src"
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
+  OPENSSL_DOWNLOAD_DIR: "/tmp/openssl-download"
 
   VALGRIND_DOWNLOAD_URL: "https://sourceware.org/pub/valgrind/valgrind-3.22.0.tar.bz2"
   VALGRIND_INSTALLATION_DIR: "/usr"
   VALGRIND_SOURCE_DIR: "/tmp/valgrind-src"
+  VALGRIND_DOWNLOAD_DIR: "/tmp/valgrind-download"
 
   # Setup: Perforce credentials
   P4PORT: "ssl:perforce.sgdev.org:1666" # the address of the Perforce server to connect to
@@ -169,21 +172,22 @@ jobs:
           
           EOF
 
-      - name: "Cache Valgrind source"
+      - name: "Cache Valgrind bzip"
         if: ${{ env.VALGRIND_FLAGS != '' }}
         id: cache-valgrind-source
         uses: actions/cache@v2
         with:
-          path: ${{ env.VALGRIND_SOURCE_DIR }}
-          key: ${{ runner.os }}-valgrind--${{ env.VALGRIND_DOWNLOAD_URL }}
+          path: ${{ env.VALGRIND_DOWNLOAD_DIR }}
+          key: ${{ runner.os }}-valgrind-bzip-${{ env.VALGRIND_DOWNLOAD_URL }}
 
-      - name: "Download Valgrind source"
-        if : ${{ env.VALGRIND_FLAGS != '' && steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
+      - name: "Download Valgrind bzip"
+        if: ${{ env.VALGRIND_FLAGS != '' && steps.cache-valgrind-source.outputs.cache-hit != 'true' }}
         run: |
-          curl -L "${VALGRIND_DOWNLOAD_URL}" > valgrind.tar.bz2
-          mkdir -p "${VALGRIND_SOURCE_DIR}" || true
-          tar -C "${VALGRIND_SOURCE_DIR}" -xjf valgrind.tar.bz2 --strip-components 1
-          rm valgrind.tar.bz2 || true
+          mkdir -p "${VALGRIND_DOWNLOAD_DIR}" || true
+          pushd "${VALGRIND_DOWNLOAD_DIR}"
+          
+          curl -L "${VALGRIND_DOWNLOAD_URL}" --output valgrind.tar.bz2
+          popd
 
       - name: "Compile Valgrind"
         if: ${{ env.VALGRIND_FLAGS != '' }}
@@ -195,6 +199,14 @@ jobs:
           
           set -euxo pipefail
           
+          # Unpack the Valgrind source
+          pushd "${VALGRIND_DOWNLOAD_DIR}"
+          
+          mkdir -p "${VALGRIND_SOURCE_DIR}" || true
+          tar -C "${VALGRIND_SOURCE_DIR}" -xjf valgrind.tar.bz2 --strip-components 1
+          
+          popd 
+          
           pushd "${VALGRIND_SOURCE_DIR}"
   
           ./configure --prefix="${VALGRIND_INSTALLATION_DIR}"
@@ -205,40 +217,57 @@ jobs:
           
           EOF
 
-      - name: "Cache Perforce API headers"
+      - name: "Cache Perforce API headers gzip"
         id: cache-p4api
         uses: actions/cache@v2
         with:
           path: vendor/helix-core-api/linux
-          key: ${{ runner.os }}-p4api-${{ env.P4_DOWNLOAD_URL }}
+          key: ${{ runner.os }}-p4api-gzip-${{ env.P4_DOWNLOAD_URL }}
 
-      - name: "Download Perforce API headers"
+      - name: "Download Perforce API headers gzip"
         if: ${{ steps.cache-p4api.outputs.cache-hit != 'true' }}
         run: |
+          mkdir -p "${P4_DOWNLOAD_DIR}" || true
+          
+          pushd "${P4_DOWNLOAD_DIR}"
           curl -L "${P4_DOWNLOAD_URL}" --output p4.tgz
-          mkdir -p vendor/helix-core-api/linux
-          tar -C vendor/helix-core-api/linux -xzf p4.tgz --strip 1
+          
+          popd          
 
-      - name: "Cache OpenSSL source"
+      - name: "Unpack Perforce API headers"
+        run: |      
+          mkdir -p vendor/helix-core-api/linux
+          tar -C vendor/helix-core-api/linux -xzf "${P4_DOWNLOAD_DIR}/p4.tgz" --strip 1
+
+      - name: "Cache OpenSSL gzip"
         id: cache-openssl-source
         uses: actions/cache@v2
         with:
           path: ${{ env.OPENSSL_SOURCE_DIR }}
-          key: ${{ runner.os }}-openssl-source-${{ env.OPENSSL_DOWNLOAD_URL }}
+          key: ${{ runner.os }}-openssl-source-gzip-${{ env.OPENSSL_DOWNLOAD_URL }}
 
-      - name: "Download OpenSSL source"
+      - name: "Download OpenSSL gzip"
         if : ${{ steps.cache-openssl-source.outputs.cache-hit != 'true' }}
         run: |
+          mkdir -p "${OPENSSL_DOWNLOAD_DIR}" || true
+          pushd "${OPENSSL_DOWNLOAD_DIR}"
+          
           curl -L "${OPENSSL_DOWNLOAD_URL}" --output openssl.tgz
-          mkdir -p "${OPENSSL_SOURCE_DIR}" || true
-          tar -C "${OPENSSL_SOURCE_DIR}" -xzf openssl.tgz --strip-components 1
-          rm openssl.tgz || true
+          popd
 
       - name: "Compile OpenSSL"
         run: |
           bash <<"EOF"
           
           set -euxo pipefail 
+          
+          # unpack the OpenSSL source
+          pushd "${OPENSSL_DOWNLOAD_DIR}"
+          
+          mkdir -p "${OPENSSL_SOURCE_DIR}" || true 
+          tar -C "${OPENSSL_SOURCE_DIR}" -xzf openssl.tgz --strip-components 1
+          
+          popd
           
           pushd "${OPENSSL_SOURCE_DIR}"
   
