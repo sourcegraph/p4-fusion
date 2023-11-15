@@ -97,10 +97,12 @@ jobs:
           ;;
         
           valgrindMemcheck)
+            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/crypto/rand/md_rand.c#L490-L500
             VALGRIND_FLAGS="--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes"
           ;;
         
           valgrindHelgrind)
+            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/crypto/rand/md_rand.c#L490-L500
             VALGRIND_FLAGS="--tool=helgrind --track-lockorders=yes --history-level=full" 
           ;;
         
