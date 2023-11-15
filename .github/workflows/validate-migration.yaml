@@ -81,14 +81,14 @@ jobs:
           ;;
               
           addressAndUndefinedSanitizer)
-            OPENSSL_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE"
-            CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all"
+            OPENSSL_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE -DPEDANTIC"
+            CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Address;Undefined"
           ;;
         
           threadSanitizer)
-            OPENSSL_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++"
+            OPENSSL_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Thread"
