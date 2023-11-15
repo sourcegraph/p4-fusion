@@ -81,6 +81,7 @@ jobs:
           ;;
               
           addressAndUndefinedSanitizer)
+            BUILD_LIBCXX="true"
             OPENSSL_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE -DPEDANTIC"
             CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
@@ -88,6 +89,7 @@ jobs:
           ;;
         
           threadSanitizer)
+            BUILD_LIBCXX="true"
             OPENSSL_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
@@ -131,6 +133,9 @@ jobs:
 
             # Set the flags for compiling OpenSSL
             echo "OPENSSL_FLAGS=${OPENSSL_FLAGS:-""}"
+          
+            # Indicate whether we should build libc++ or not
+            echo "BUILD_LIBCXX=${BUILD_LIBCXX:-"false"}"
 
             # Set the temporary Perforce client name to use while validating the git migration
             echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}"
@@ -192,6 +197,7 @@ jobs:
           EOF
 
       - name: "Cache LLVM project gzip"
+        if : ${{ env.BUILD_LIBCXX == 'true' }}
         id: cache-llvm-project-source
         uses: actions/cache@v2
         with:
@@ -199,7 +205,7 @@ jobs:
           key: ${{ runner.os }}-llvm-project-gzip-${{ env.LLVM_PROJECT_DOWNLOAD_URL }}
 
       - name: "Download LLVM project"
-        if: ${{ steps.cache-llvm-project-source.outputs.cache-hit != 'true' }}
+        if: ${{ env.BUILD_LIBCXX == 'true' && steps.cache-llvm-project-source.outputs.cache-hit != 'true' }}
         run: |
           mkdir -p "${LLVM_PROJECT_DOWNLOAD_DIR}" || true
           pushd "${LLVM_PROJECT_DOWNLOAD_DIR}"
@@ -208,11 +214,13 @@ jobs:
           popd
 
       - name: "Unpack LLVM project"
+        if: ${{ env.BUILD_LIBCXX == 'true' }}
         run: |
           mkdir -p "${LLVM_PROJECT_SOURCE_DIR}" || true
           tar -C "${LLVM_PROJECT_SOURCE_DIR}" -xzf "${LLVM_PROJECT_DOWNLOAD_DIR}/llvm-project.tar.gz" --strip-components 1
 
       - name: "Install LibCXX"
+        if: ${{ env.BUILD_LIBCXX == 'true' }}
         run: |          
           pushd "${LLVM_PROJECT_SOURCE_DIR}"
           
