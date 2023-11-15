@@ -8,10 +8,10 @@ concurrency:
 
 env:
   # Setup: Constants for downloading and compiling dependencies
-  P4_DOWNLOAD_URL: "https://www.perforce.com/downloads/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.0.2.tgz"
+  P4_DOWNLOAD_URL: "https://cdist2.perforce.com/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.1.1.tgz"
   P4_DOWNLOAD_DIR: "/tmp/p4-download"
 
-  OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.0.2u.tar.gz"
+  OPENSSL_DOWNLOAD_URL: "https://www.openssl.org/source/openssl-1.1.1w.tar.gz"
   OPENSSL_SOURCE_DIR: "/tmp/openssl-src"
   OPENSSL_INSTALL_DIR: "/tmp/openssl-install"
   OPENSSL_DOWNLOAD_DIR: "/tmp/openssl-download"
