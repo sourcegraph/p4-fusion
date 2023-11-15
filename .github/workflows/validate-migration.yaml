@@ -340,6 +340,7 @@ jobs:
   
           CONFIG_ARGS=(
             --prefix="${OPENSSL_INSTALL_DIR}"
+            --openssldir="${OPENSSL_INSTALL_DIR}" 
           )
           
           read -r -a array <<<"${OPENSSL_FLAGS:-}"
