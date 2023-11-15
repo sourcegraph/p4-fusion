@@ -82,14 +82,14 @@ jobs:
               
           addressAndUndefinedSanitizer)
             OPENSSL_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE -DPEDANTIC"
-            CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
+            CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Address;Undefined"
           ;;
         
           threadSanitizer)
             OPENSSL_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
-            CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all"
+            CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Thread"
           ;;
@@ -356,7 +356,7 @@ jobs:
         env:
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           USE_VALGRIND: ${{ env.VALGRIND_FLAGS != '' }}
-          LIBCXX_INSTALL_DIR: $${{ env.LLVM_PROJECT_INSTALL_DIR }}
+          LIBCXX_INSTALL_DIR: ${{ env.LLVM_PROJECT_INSTALL_DIR }}
 
       - name: "Ensure p4 client is deleted"
         if: always()
