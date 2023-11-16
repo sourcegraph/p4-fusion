@@ -68,7 +68,6 @@ jobs:
           case ${{ matrix.tool }} in
           
           noTool)
-            # No tool is being used, so we don't need to set any flags
             CMAKE_CXX_FLAGS="-stdlib=libc++"
           ;;
               
@@ -78,12 +77,6 @@ jobs:
             CMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -stdlib=libc++ -fPIE"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Address;Undefined"
-          
-            # Use Clang's Sanitizer implementation
-            CC="sccache clang-16"
-            CXX="sccache clang++-16"
-            CMAKE_CXX_COMPILER="clang++-16"
-            CMAKE_C_COMPILER="clang-16"
           ;;
         
           threadSanitizer)
@@ -92,12 +85,6 @@ jobs:
             CMAKE_CXX_FLAGS="-fsanitize=thread -fno-sanitize-recover=all -nostdinc++ -nostdlib++ -fPIE -stdlib=libc++"
             CMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi -lunwind -pie"
             LLVM_USE_SANITIZER="Thread"
-          
-            # Use Clang's Sanitizer implementation
-            CC="sccache clang-16"
-            CXX="sccache clang++-16"
-            CMAKE_CXX_COMPILER="clang++-16"
-            CMAKE_C_COMPILER="clang-16"
           ;;
         
           valgrindMemcheck)
@@ -105,22 +92,15 @@ jobs:
             VALGRIND_FLAGS="--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes"
           
             # Use GCC instead of Clang for Valgrind since Ubuntu ships with suppression files for glibc
-            CC="sccache gcc"
-            CXX="sccache g++"
-            CMAKE_CXX_COMPILER="g++"
-            CMAKE_C_COMPILER="gcc"
+            USE_GCC="true"
           ;;
         
           valgrindHelgrind)
             OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/crypto/rand/md_rand.c#L490-L500
-            VALGRIND_FLAGS="--tool=helgrind --track-lockorders=yes --history-level=full" 
-          
+            VALGRIND_FLAGS="--tool=helgrind --track-lockorders=yes --history-level=full"           
+            
             # Use GCC instead of Clang for Valgrind since Ubuntu ships with suppression files for glibc
-
-            CC="sccache gcc"
-            CXX="sccache g++"
-            CMAKE_CXX_COMPILER="g++"
-            CMAKE_C_COMPILER="gcc"
+            USE_GCC="true"
           ;;
         
           *)
@@ -157,11 +137,20 @@ jobs:
             echo "BUILD_LIBCXX=${BUILD_LIBCXX:-"false"}"
           
             # Configure the C/C++ compilers
-            echo "CC=${CC:-"sccache clang-16"}"
-            echo "CXX=${CXX:-"sccache clang++-16"}"
-            echo "CMAKE_C_COMPILER=${CMAKE_C_COMPILER:-"clang-16"}"
-            echo "CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER:-"clang++-16"}"
 
+            if [[ "${USE_GCC:-"false"}" == "true" ]]; then
+              echo 'CC=sccache gcc'
+              echo 'CXX=sccache g++'
+              echo 'CMAKE_C_COMPILER=gcc'
+              echo 'CMAKE_CXX_COMPILER=g++'
+            else
+              # use clang 
+              echo 'CC=sccache clang-16'
+              echo 'CXX=sccache clang++-16'
+              echo 'CMAKE_C_COMPILER=clang-16'
+              echo 'CMAKE_CXX_COMPILER=clang++-16'
+            fi 
+        
             # Set the temporary Perforce client name to use while validating the git migration
             echo "P4CLIENT=validate-migration-${{ github.ref_name }}-${{ github.sha }}-${{ github.run_number }}-${{ matrix.tool }}"
           } >>"$GITHUB_ENV"
