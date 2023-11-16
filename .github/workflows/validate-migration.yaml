@@ -88,7 +88,7 @@ jobs:
           ;;
         
           valgrindMemcheck)
-            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/crypto/rand/md_rand.c#L490-L500
+            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_1_1-stable/Configure#L113-L124
             VALGRIND_FLAGS="--tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes"
           
             # Use GCC instead of Clang for Valgrind since Ubuntu ships with suppression files for glibc
@@ -96,7 +96,7 @@ jobs:
           ;;
         
           valgrindHelgrind)
-            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_0_2-stable/crypto/rand/md_rand.c#L490-L500
+            OPENSSL_FLAGS="-DPURIFY" # See https://github.com/openssl/openssl/blob/OpenSSL_1_1_1-stable/Configure#L113-L124
             VALGRIND_FLAGS="--tool=helgrind --track-lockorders=yes --history-level=full"           
             
             # Use GCC instead of Clang for Valgrind since Ubuntu ships with suppression files for glibc
