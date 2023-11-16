@@ -334,7 +334,7 @@ jobs:
 
       - name: "Build P4 Fusion and run validate migration script"
         run: |
-          timeout --verbose 1h .github/workflows/validate-migration-scripts/build-p4-fusion-and-run-validate-migration.sh
+          timeout --verbose 30m .github/workflows/validate-migration-scripts/build-p4-fusion-and-run-validate-migration.sh
         env:
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           USE_VALGRIND: ${{ env.VALGRIND_FLAGS != '' }}
