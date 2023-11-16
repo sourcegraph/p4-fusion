@@ -125,6 +125,10 @@ jobs:
           
             echo "CMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS:-""}"
           
+            # Set the number of parallel jobs to use when compiling
+            # See https://cmake.org/cmake/help/latest/envvar/CMAKE_BUILD_PARALLEL_LEVEL.html for more information
+            echo "CMAKE_BUILD_PARALLEL_LEVEL=$(($(nproc) + 1))"
+          
             echo "LLVM_USE_SANITIZER=${LLVM_USE_SANITIZER:-""}"
 
             # Set the flags for compiling Valgrind
@@ -324,7 +328,7 @@ jobs:
           done
           
           ./config "${CONFIG_ARGS[@]}"
-          make --jobs="$(nproc)"
+          make --jobs="$(($(nproc) + 1))"
           
           sudo make install 
           
@@ -334,7 +338,15 @@ jobs:
 
       - name: "Build P4 Fusion and run validate migration script"
         run: |
+          bash <<"EOF"
+          
+          set -euxo pipefail
+          
+          export NUM_NETWORK_THREADS="$(($(nproc) + 1))" # use one more than the number of cores
+          
           timeout --verbose 30m .github/workflows/validate-migration-scripts/build-p4-fusion-and-run-validate-migration.sh
+          
+          EOF
         env:
           OPENSSL_ROOT_DIR: ${{ env.OPENSSL_INSTALL_DIR }}
           USE_VALGRIND: ${{ env.VALGRIND_FLAGS != '' }}

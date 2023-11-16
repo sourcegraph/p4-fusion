@@ -9,9 +9,10 @@ set -euxo pipefail
 
 export P4USER="${P4USER:-"admin"}"                       # the name of the Perforce superuser that the script will use to create the depot
 export P4PORT="${P4PORT:-"ssl:perforce.sgdev.org:1666"}" # the address of the Perforce server to connect to
-
-export DEPOT_NAME="${DEPOT_NAME:-"source/src-cli"}"      # the name of the depot that the script will create on the server
 export P4CLIENT="${P4CLIENT:-"integration-test-client"}" # the name of the temporary client that the script will use while it creates the depot
+
+export NUM_NETWORK_THREADS="${NUM_NETWORK_THREADS:-"64"}" # the number of network threads to use when running p4-fusion
+export DEPOT_NAME="${DEPOT_NAME:-"source/src-cli"}"      # the name of the depot that the script will create on the server
 
 TMP="$(mktemp -d)"
 export DEPOT_DIR="${TMP}/${DEPOT_NAME}"
@@ -75,7 +76,7 @@ echo "::group::{Run p4-fusion against the downloaded depot}"
     --client "${P4CLIENT}"
     --user "$P4USER"
     --src "${GIT_DEPOT_DIR}"
-    --networkThreads 64
+    --networkThreads "${NUM_NETWORK_THREADS}"
     --port "${P4PORT}"
     --lookAhead 15000
     --printBatch 1000
