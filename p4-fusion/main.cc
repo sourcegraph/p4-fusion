@@ -142,6 +142,11 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
+	GitAPI git(srcPath, fsyncEnable, timezoneMinutes);
+
+	// This throws on error.
+	git.InitializeRepository(arguments.GetNoBaseCommit());
+
 	// Create the thread pool
 	int networkThreads = arguments.GetNetworkThreads();
 	PRINT("Creating " << networkThreads << " network threads")
@@ -212,11 +217,6 @@ int Main(int argc, char** argv)
 	PRINT("Profiling Flush Rate: " << flushRate)
 	PRINT("No Colored Output: " << noColor)
 	PRINT("Inspecting " << branchSet.Count() << " branches")
-
-	GitAPI git(srcPath, fsyncEnable, timezoneMinutes);
-
-	// This throws on error.
-	git.InitializeRepository(arguments.GetNoBaseCommit());
 
 	// Setup trace file generation. This HAS to happen after initializing the
 	// repository, only then the tracePath will be ensured to exist.
