@@ -327,8 +327,8 @@ int Main(int argc, char** argv)
 		PRINT("Waiting for download of CL " << cl.number << " to complete")
 		cl.WaitForDownload();
 
-		std::string fullName = cl.user;
-		std::string email = "deleted@user";
+		std::string fullName(cl.user);
+		std::string email("deleted@user");
 		if (users.find(cl.user) != users.end())
 		{
 			fullName = users.at(cl.user).fullName;
