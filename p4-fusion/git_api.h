@@ -57,7 +57,7 @@ public:
 
 	// WriteBlob returns a new BlobWriter instance that allows to write a single
 	// blob to the repository's ODB.
-	BlobWriter* WriteBlob() const;
+	BlobWriter WriteBlob() const;
 
 	void InitializeRepository(bool noCreateBaseCommit);
 	void OpenRepository();

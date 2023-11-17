@@ -6,11 +6,6 @@
  */
 #include "filelog_result.h"
 
-FileLogResult::FileLogResult(GitAPI& gitRepo)
-    : m_Git(gitRepo)
-{
-}
-
 FileLogResult& FileLogResult::operator=(const FileLogResult& other)
 {
 	if (this == &other)
@@ -19,7 +14,6 @@ FileLogResult& FileLogResult::operator=(const FileLogResult& other)
 		return *this;
 	}
 
-	m_Git = other.m_Git;
 	m_FileData = other.m_FileData;
 	return *this;
 }
@@ -41,7 +35,7 @@ void FileLogResult::OutputStat(StrDict* varList)
 	std::string revision = varList->GetVar("rev0")->Text();
 	std::string action = varList->GetVar("action0")->Text();
 
-	m_FileData.emplace_back(m_Git, depotFileStr, revision, action, type);
+	m_FileData.emplace_back(depotFileStr, revision, action, type);
 	FileData& fileData = m_FileData.back();
 
 	// Could optimize here by only performing this loop if the action type is

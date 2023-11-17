@@ -18,23 +18,13 @@ FileDataStore::FileDataStore(std::string& _depotFile, std::string& _revision, st
 	SetAction(action);
 }
 
-FileData::FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type)
+FileData::FileData(std::string& depotFile, std::string& revision, std::string& action, std::string& type)
     : m_data(std::make_shared<FileDataStore>(depotFile, revision, action, type))
-    , m_Git(git)
-    , writer(nullptr)
 {
-}
-
-FileData::~FileData()
-{
-	free(writer);
-	writer = nullptr;
 }
 
 FileData::FileData(const FileData& copy)
     : m_data(copy.m_data)
-    , m_Git(copy.m_Git)
-    , writer(nullptr)
 {
 }
 
@@ -46,8 +36,6 @@ FileData& FileData::operator=(const FileData& other)
 	}
 
 	m_data = other.m_data;
-	m_Git = other.m_Git;
-	writer = other.writer;
 	return *this;
 }
 
@@ -64,7 +52,7 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 	}
 }
 
-void FileData::StartWrite()
+void FileData::SetBlobOID(std::string&& blobOID)
 {
 	if (m_data->isBlobOIDSet)
 	{
@@ -73,22 +61,7 @@ void FileData::StartWrite()
 		return;
 	}
 
-	writer = m_Git.WriteBlob();
-}
-
-void FileData::Write(const char* contents, int length)
-{
-	writer->Write(contents, length);
-}
-
-void FileData::Finalize()
-{
-	m_data->blobOID = writer->Close();
-	if (writer != nullptr)
-	{
-		free(writer);
-	}
-	writer = nullptr;
+	m_data->blobOID = std::move(blobOID);
 	m_data->isBlobOIDSet = true;
 	m_data->isContentsPendingDownload = false;
 }

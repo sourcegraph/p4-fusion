@@ -191,17 +191,17 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	return result;
 }
 
-DescribeResult P4API::Describe(GitAPI& git, const int cl)
+DescribeResult P4API::Describe(const int cl)
 {
 	MTR_SCOPE("P4", __func__);
 
 	return Run<DescribeResult>("describe", { "-s", // Omit the diffs
 	                                           std::to_string(cl) },
-	    [&git]() -> DescribeResult
-	    { return { git }; });
+	    []() -> DescribeResult
+	    { return {}; });
 }
 
-FileLogResult P4API::FileLog(GitAPI& git, const int changelist)
+FileLogResult P4API::FileLog(const int changelist)
 {
 	return Run<FileLogResult>("filelog", {
 	                                         "-c", // restrict output to a single changelist
@@ -209,8 +209,8 @@ FileLogResult P4API::FileLog(GitAPI& git, const int changelist)
 	                                         "-m1", // don't get the full history, just the first entry.
 	                                         "//..." // rather than require the path to be passed in, just list all files.
 	                                     },
-	    [&git]() -> FileLogResult
-	    { return { git }; });
+	    []() -> FileLogResult
+	    { return {}; });
 }
 
 PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput)

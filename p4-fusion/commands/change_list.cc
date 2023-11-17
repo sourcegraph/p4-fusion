@@ -36,7 +36,7 @@ void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branch
 		// copy will have the target files listing the from-file with
 		// different changelists than the point-in-time source branch's
 		// changelist.
-		const FileLogResult& filelog = p4.FileLog(git, number);
+		const FileLogResult& filelog = p4.FileLog(number);
 		if (filelog.HasError())
 		{
 			throw std::runtime_error(filelog.PrintError());
@@ -46,7 +46,7 @@ void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branch
 	else
 	{
 		// If we don't care about branches, then p4->Describe is much faster.
-		const DescribeResult& describe = p4.Describe(git, number);
+		const DescribeResult& describe = p4.Describe(number);
 		if (describe.HasError())
 		{
 			ERR("Failed to describe changelist: " << describe.PrintError())
@@ -62,7 +62,7 @@ void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branch
 	}
 }
 
-void ChangeList::StartDownload(P4API& p4, const int& printBatch)
+void ChangeList::StartDownload(P4API& p4, GitAPI& git, const int& printBatch)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -91,7 +91,7 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 					// Clear the batches if it fits
 					if (printBatchFileData.size() >= printBatch)
 					{
-						Flush(p4, printBatchFileData);
+						Flush(p4, git, printBatchFileData);
 
 						// We let go of the refs held by us and create new ones to queue the next batch
 						printBatchFileData.clear();
@@ -104,12 +104,12 @@ void ChangeList::StartDownload(P4API& p4, const int& printBatch)
 
 	// Flush any remaining files that were smaller in number than the total batch size.
 	// Additionally, signal the batch processing end.
-	Flush(p4, printBatchFileData);
+	Flush(p4, git, printBatchFileData);
 	*downloadJobsCompleted = true;
 	commitCV->notify_all();
 }
 
-void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileData)
+void ChangeList::Flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileData)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -136,27 +136,27 @@ void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileDa
 	// The PrintFiles function takes two callbacks, one for stat, basically "a new
 	// file begins here", and then for small chunks of data of that file.
 	long idx = -1;
+	BlobWriter writer = git.WriteBlob();
 	PrintResult printResp = p4.PrintFiles(
-	    fileRevisions, [&idx, &printBatchFileData]
+	    fileRevisions, [&idx, &writer, &git, &printBatchFileData]
 	    {
 			// For the first file, we don't need to run finalize on the previous
 			// file so we're done here.
 		    if (idx == -1)
 		    {
 			    idx++;
-			    printBatchFileData.at(idx)->StartWrite();
 			    return;
 		    }
-			// First, finalize the previous file.
-		    printBatchFileData.at(idx)->Finalize();
+		    // First, finalize the previous file.
+		    printBatchFileData.at(idx)->SetBlobOID(writer.Close());
 			// Now step one file further.
 		    idx++;
 			// And start a write for the next file.
-		    printBatchFileData.at(idx)->StartWrite(); },
-	    [&idx, &printBatchFileData](const char* contents, int length)
+		    writer = git.WriteBlob(); },
+	    [&writer](const char* contents, int length)
 	    {
 		    // Write a chunk of the data to the currently processed file.
-		    printBatchFileData.at(idx)->Write(contents, length);
+		    writer.Write(contents, length);
 	    });
 	if (printResp.HasError())
 	{
@@ -166,7 +166,7 @@ void ChangeList::Flush(P4API& p4, const std::vector<FileData*>& printBatchFileDa
 	// to the ODB still, so let's do that.
 	if (idx > -1)
 	{
-		printBatchFileData.back()->Finalize();
+		printBatchFileData.back()->SetBlobOID(writer.Close());
 	}
 }
 

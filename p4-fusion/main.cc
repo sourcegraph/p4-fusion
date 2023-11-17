@@ -307,9 +307,9 @@ int Main(int argc, char** argv)
 	{
 		ChangeList& cl = changes.at(currentCL);
 
-		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
+		pool.AddJob([&downloaded, &cl, printBatch](P4API& p4, GitAPI& git)
 		    {
-			cl.StartDownload(p4, printBatch);
+			cl.StartDownload(p4, git, printBatch);
 			// Mark download as done.
 			downloaded++; });
 	}
@@ -385,7 +385,7 @@ int Main(int argc, char** argv)
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
 			    {
 				downloadCL.PrepareDownload(p4, git, branchSet);
-				downloadCL.StartDownload(p4, printBatch);
+				downloadCL.StartDownload(p4, git, printBatch);
 				// Mark download as done.
 				downloaded++; });
 		}

@@ -397,9 +397,9 @@ BlobWriter::BlobWriter(git_repository* gitRepo)
 {
 }
 
-BlobWriter* GitAPI::WriteBlob() const
+BlobWriter GitAPI::WriteBlob() const
 {
-	return new BlobWriter(m_Repo);
+	return BlobWriter(m_Repo);
 }
 
 void BlobWriter::Write(const char* contents, int length)

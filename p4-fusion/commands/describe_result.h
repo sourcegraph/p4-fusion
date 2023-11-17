@@ -13,17 +13,12 @@
 #include "file_data.h"
 #include "result.h"
 
-class GitAPI;
-
 class DescribeResult : public Result
 {
 private:
 	std::vector<FileData> m_FileData;
-	GitAPI& m_Git;
 
 public:
-	DescribeResult() = delete;
-	DescribeResult(GitAPI& git);
 	DescribeResult& operator=(const DescribeResult& other);
 	const std::vector<FileData>& GetFileData() const { return m_FileData; }
 

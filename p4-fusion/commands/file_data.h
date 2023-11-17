@@ -11,9 +11,6 @@
 #include "common.h"
 #include "utils/std_helpers.h"
 
-class GitAPI;
-class BlobWriter;
-
 #define FAKE_INTEGRATION_DELETE_ACTION_NAME "FAKE merge delete"
 
 // See https://www.perforce.com/manuals/cmdref/Content/CmdRef/p4_fstat.html
@@ -71,13 +68,10 @@ struct FileData
 {
 private:
 	std::shared_ptr<FileDataStore> m_data;
-	GitAPI& m_Git;
-	BlobWriter* writer;
 
 public:
 	FileData() = delete;
-	~FileData();
-	FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type);
+	FileData(std::string& depotFile, std::string& revision, std::string& action, std::string& type);
 	FileData(const FileData& copy);
 	FileData& operator=(const FileData& other);
 
@@ -85,9 +79,7 @@ public:
 	void SetRelativePath(std::string& relativePath);
 	void SetFakeIntegrationDeleteAction() { m_data->SetAction(FAKE_INTEGRATION_DELETE_ACTION_NAME); };
 
-	void StartWrite();
-	void Write(const char* contents, int length);
-	void Finalize();
+	void SetBlobOID(std::string&& blobOID);
 	void SetPendingDownload();
 	bool IsDownloadNeeded() const { return !m_data->isBlobOIDSet && !m_data->isContentsPendingDownload; };
 
