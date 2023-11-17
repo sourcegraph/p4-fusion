@@ -35,7 +35,7 @@ trap cleanup EXIT
 
 echo "::group::{Ensure that Perforce credentials are valid}"
 {
-  if ! p4 login -s &>/dev/null; then
+  if ! p4 login -s; then
     handbook_link="https://handbook.sourcegraph.com/departments/ce-support/support/process/p4-enablement/#generate-a-session-ticket"
     address="${P4USER}:${P4PORT}"
 
