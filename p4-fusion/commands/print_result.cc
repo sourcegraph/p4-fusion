@@ -8,7 +8,11 @@
 
 #include <utility>
 
-PrintResult::PrintResult(std::function<void()> stat, std::function<void(const char*, int)> out): onStat(std::move(stat)),onOutput(std::move(out)) {}
+PrintResult::PrintResult(std::function<void()> stat, std::function<void(const char*, int)> out)
+    : onStat(std::move(stat))
+    , onOutput(std::move(out))
+{
+}
 
 void PrintResult::OutputStat(StrDict* varList)
 {
