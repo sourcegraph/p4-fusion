@@ -20,14 +20,13 @@ std::string P4API::P4USER;
 std::string P4API::P4CLIENT;
 int P4API::CommandRetries = 1;
 int P4API::CommandRefreshThreshold = 1;
-// std::mutex P4API::InitializationMutex;
 
 P4API::P4API()
 {
 	if (!Initialize())
 	{
-		ERR("Could not initialize P4API");
-		return;
+		ERR("Could not initialize P4API")
+		throw std::runtime_error("Could not initialize P4API");
 	}
 
 	AddClientSpecView(ClientSpec.mapping);
@@ -36,9 +35,6 @@ P4API::P4API()
 bool P4API::Initialize()
 {
 	MTR_SCOPE("P4", __func__);
-
-	// Helix Core C++ API seems to crash while making connections parallely.
-	// std::unique_lock<std::mutex> lock(InitializationMutex);
 
 	Error e;
 	StrBuf msg;
@@ -52,7 +48,7 @@ bool P4API::Initialize()
 
 	if (!CheckErrors(e, msg))
 	{
-		ERR("Could not initialize Helix Core C/C++ API");
+		ERR("Could not initialize Helix Core C/C++ API")
 		return false;
 	}
 
@@ -61,15 +57,11 @@ bool P4API::Initialize()
 
 bool P4API::Deinitialize()
 {
-	// std::unique_lock<std::mutex> lock(InitializationMutex);
-
 	Error e;
 	StrBuf msg;
 
 	m_ClientAPI.Final(&e);
-	CheckErrors(e, msg);
-
-	return true;
+	return CheckErrors(e, msg);
 }
 
 bool P4API::Reinitialize()
@@ -118,7 +110,7 @@ bool P4API::InitializeLibraries()
 		StrBuf msg;
 		e.Fmt(&msg);
 		ERR(msg.Text());
-		ERR("Failed to initialize P4Libraries");
+		ERR("Failed to initialize P4Libraries")
 		return false;
 	}
 
@@ -127,7 +119,7 @@ bool P4API::InitializeLibraries()
 	std::signal(SIGINT, SIG_DFL);
 	signaler.Disable();
 
-	SUCCESS("Initialized P4Libraries successfully");
+	SUCCESS("Initialized P4Libraries successfully")
 	return true;
 }
 
@@ -139,7 +131,7 @@ bool P4API::ShutdownLibraries()
 	{
 		StrBuf msg;
 		e.Fmt(&msg);
-		ERR(msg.Text());
+		ERR(msg.Text())
 		return false;
 	}
 	return true;
@@ -152,12 +144,14 @@ void P4API::AddClientSpecView(const std::vector<std::string>& viewStrings)
 
 ClientResult P4API::Client()
 {
-	return Run<ClientResult>("client", { "-o" });
+	return Run<ClientResult>("client", { "-o" }, []() -> ClientResult
+	    { return {}; });
 }
 
 TestResult P4API::TestConnection(const int retries)
 {
-	return RunEx<TestResult>("changes", { "-m", "1", "//..." }, retries);
+	return RunEx<TestResult>("changes", { "-m", "1", "//..." }, retries, []() -> TestResult
+	    { return {}; });
 }
 
 ChangesResult P4API::Changes(const std::string& path, const std::string& from, int32_t maxCount)
@@ -175,7 +169,7 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 	{
 		maxCountStr = std::to_string(maxCount);
 
-		args.push_back("-m"); // Only send max this many number of CLs
+		args.emplace_back("-m"); // Only send max this many number of CLs
 		args.push_back(maxCountStr);
 	}
 
@@ -191,48 +185,58 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 
 	args.push_back(path + pathAddition);
 
-	ChangesResult result = Run<ChangesResult>("changes", args);
+	ChangesResult result = Run<ChangesResult>("changes", args, []() -> ChangesResult
+	    { return {}; });
 
 	return result;
 }
 
-DescribeResult P4API::Describe(const std::string& cl)
+DescribeResult P4API::Describe(GitAPI& git, const int cl)
 {
 	MTR_SCOPE("P4", __func__);
+
 	return Run<DescribeResult>("describe", { "-s", // Omit the diffs
-	                                           cl });
+	                                           std::to_string(cl) },
+	    [&git]() -> DescribeResult
+	    { return { git }; });
 }
 
-FileLogResult P4API::FileLog(const std::string& changelist)
+FileLogResult P4API::FileLog(GitAPI& git, const int changelist)
 {
 	return Run<FileLogResult>("filelog", {
 	                                         "-c", // restrict output to a single changelist
-	                                         changelist,
+	                                         std::to_string(changelist),
 	                                         "-m1", // don't get the full history, just the first entry.
 	                                         "//..." // rather than require the path to be passed in, just list all files.
-	                                     });
+	                                     },
+	    [&git]() -> FileLogResult
+	    { return { git }; });
 }
 
-PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions)
+PrintResult P4API::PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput)
 {
 	MTR_SCOPE("P4", __func__);
 
 	if (fileRevisions.empty())
 	{
-		return PrintResult();
+		return { onStat, onOutput };
 	}
 
-	return Run<PrintResult>("print", fileRevisions);
+	return Run<PrintResult>("print", fileRevisions, [&onStat, &onOutput]() -> PrintResult
+	    { return { onStat, onOutput }; });
 }
 
 UsersResult P4API::Users()
 {
 	return Run<UsersResult>("users", {
 	                                     "-a" // Include service accounts
-	                                 });
+	                                 },
+	    []() -> UsersResult
+	    { return {}; });
 }
 
 InfoResult P4API::Info()
 {
-	return Run<InfoResult>("info", {});
+	return Run<InfoResult>("info", {}, []() -> InfoResult
+	    { return {}; });
 }

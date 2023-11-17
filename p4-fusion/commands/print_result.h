@@ -7,24 +7,19 @@
 #pragma once
 
 #include <vector>
-
+#include <functional>
 #include "common.h"
 #include "result.h"
 
 class PrintResult : public Result
 {
-public:
-	struct PrintData
-	{
-		std::vector<char> contents;
-	};
-
 private:
-	std::vector<PrintData> m_Data;
+	std::function<void()> onStat;
+	std::function<void(const char*, int)> onOutput;
 
 public:
-	const std::vector<PrintData>& GetPrintData() const { return m_Data; }
-
+	PrintResult() = delete;
+	PrintResult(std::function<void()> onStat, std::function<void(const char*, int)> onOutput);
 	void OutputStat(StrDict* varList) override;
 	void OutputText(const char* data, int length) override;
 	void OutputBinary(const char* data, int length) override;

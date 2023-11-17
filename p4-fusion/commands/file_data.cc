@@ -5,27 +5,35 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include "file_data.h"
+#include "git_api.h"
 
-FileDataStore::FileDataStore()
-    : actionCategory(FileAction::FileAdd)
-    , isContentsSet(false)
+FileDataStore::FileDataStore(std::string& _depotFile, std::string& _revision, std::string& action, std::string& type)
+    : depotFile(_depotFile)
+    , revision(_revision)
+    , isBinary(STDHelpers::Contains(type, "binary"))
+    , isExecutable(STDHelpers::Contains(type, "+x"))
+    , isBlobOIDSet(false)
     , isContentsPendingDownload(false)
+{
+	SetAction(action);
+}
+
+FileData::FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type)
+    : m_data(std::make_shared<FileDataStore>(depotFile, revision, action, type))
+    , m_Git(git)
+    , writer(nullptr)
 {
 }
 
-FileData::FileData(std::string& depotFile, std::string& revision, std::string& action, std::string& type)
-    : m_data(std::make_shared<FileDataStore>())
+FileData::~FileData()
 {
-	m_data->depotFile = depotFile;
-	m_data->revision = revision;
-	m_data->SetAction(action);
-	m_data->type = type;
-	m_data->isContentsSet = false;
-	m_data->isContentsPendingDownload = false;
+	free(writer);
 }
 
 FileData::FileData(const FileData& copy)
     : m_data(copy.m_data)
+    , m_Git(copy.m_Git)
+    , writer(nullptr)
 {
 }
 
@@ -37,6 +45,7 @@ FileData& FileData::operator=(FileData& other)
 		return *this;
 	}
 	m_data = other.m_data;
+	m_Git = other.m_Git;
 	return *this;
 }
 
@@ -53,24 +62,35 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 	}
 }
 
-void FileData::MoveContentsOnceFrom(const std::vector<char>& contents)
+void FileData::StartWrite()
 {
-	// TODO double-check the thread logic here.  It needs to be thread safe.
-
-	if (m_data->isContentsSet)
+	if (m_data->isBlobOIDSet)
 	{
 		// Do not set the contents.  Assume that
 		// they were already set or, worst case, are currently being set.
 		return;
 	}
-	m_data->isContentsSet = true;
-	m_data->contents = std::move(contents);
+
+	writer = m_Git.WriteBlob();
+}
+
+void FileData::Write(const char* contents, int length)
+{
+	writer->Write(contents, length);
+}
+
+void FileData::Finalize()
+{
+	m_data->blobOID = writer->Close();
+	free(writer);
+	writer = nullptr;
+	m_data->isBlobOIDSet = true;
 	m_data->isContentsPendingDownload = false;
 }
 
 void FileData::SetPendingDownload()
 {
-	if (!m_data->isContentsSet)
+	if (!m_data->isBlobOIDSet)
 	{
 		m_data->isContentsPendingDownload = true;
 	}
@@ -81,21 +101,10 @@ void FileData::SetRelativePath(std::string& relativePath)
 	m_data->relativePath = relativePath;
 }
 
-bool FileData::IsBinary() const
-{
-	return STDHelpers::Contains(m_data->type, "binary");
-}
-
-bool FileData::IsExecutable() const
-{
-	return STDHelpers::Contains(m_data->type, "+x");
-}
-
 FileAction extrapolateFileAction(std::string& action);
 
 void FileDataStore::SetAction(std::string fileAction)
 {
-	action = fileAction;
 	actionCategory = extrapolateFileAction(fileAction);
 	switch (actionCategory)
 	{
@@ -134,11 +143,9 @@ void FileDataStore::Clear()
 {
 	depotFile.clear();
 	revision.clear();
-	action.clear();
-	type.clear();
 	fromDepotFile.clear();
 	fromRevision.clear();
-	contents.clear();
+	blobOID.clear();
 	relativePath.clear();
 }
 
@@ -194,17 +201,17 @@ FileAction extrapolateFileAction(std::string& action)
 	if (STDHelpers::Contains(action, "delete"))
 	{
 		// Looks like a delete.
-		WARN("Found an unsupported action " << action << "; assuming delete");
+		WARN("Found an unsupported action " << action << "; assuming delete")
 		return FileAction::FileDelete;
 	}
 	if (STDHelpers::Contains(action, "move/"))
 	{
 		// Looks like a new kind of integrate.
-		WARN("Found an unsupported action " << action << "; assuming move/add");
+		WARN("Found an unsupported action " << action << "; assuming move/add")
 		return FileAction::FileMoveAdd;
 	}
 
 	// assume an edit, as it's the safe bet.
-	WARN("Found an unsupported action " << action << "; assuming edit");
+	WARN("Found an unsupported action " << action << "; assuming edit")
 	return FileAction::FileEdit;
 }
