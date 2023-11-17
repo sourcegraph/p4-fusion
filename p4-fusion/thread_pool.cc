@@ -101,7 +101,7 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
 
 	for (int i = 0; i < size; i++)
 	{
-		m_Threads.emplace_back([this, i, &repoPath, &fsyncEnable, &tz]()
+		m_Threads.emplace_back([this, i, repoPath, fsyncEnable, tz]()
 		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
