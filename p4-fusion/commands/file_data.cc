@@ -37,13 +37,13 @@ FileData::FileData(const FileData& copy)
 {
 }
 
-FileData& FileData::operator=(FileData& other)
+FileData& FileData::operator=(const FileData& other)
 {
 	if (this == &other)
 	{
-		// guard...
 		return *this;
 	}
+
 	m_data = other.m_data;
 	m_Git = other.m_Git;
 	return *this;

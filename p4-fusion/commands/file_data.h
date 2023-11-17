@@ -79,7 +79,7 @@ public:
 	~FileData();
 	FileData(GitAPI& git, std::string& depotFile, std::string& revision, std::string& action, std::string& type);
 	FileData(const FileData& copy);
-	FileData& operator=(FileData& other);
+	FileData& operator=(const FileData& other);
 
 	void SetFromDepotFile(const std::string& fromDepotFile, const std::string& fromRevision);
 	void SetRelativePath(std::string& relativePath);
