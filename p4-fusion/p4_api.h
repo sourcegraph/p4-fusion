@@ -62,7 +62,7 @@ public:
 	TestResult TestConnection(int retries);
 	ChangesResult Changes(const std::string& path, const std::string& from, int32_t maxCount);
 	DescribeResult Describe(int cl);
-	FileLogResult FileLog(const int changelist);
+	FileLogResult FileLog(int changelist);
 	PrintResult PrintFiles(const std::vector<std::string>& fileRevisions, const std::function<void()>& onStat, const std::function<void(const char*, int)>& onOutput);
 	ClientResult Client();
 	UsersResult Users();
@@ -75,7 +75,8 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 	std::string argsString;
 	for (const std::string& stringArg : stringArguments)
 	{
-		argsString += " " + stringArg;
+		argsString.append(" ");
+		argsString.append(stringArg);
 	}
 
 	std::vector<char*> argsCharArray;
