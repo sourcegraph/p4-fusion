@@ -53,6 +53,8 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+      - name: "Env"
+        run: env
       - name: "Prepare environment for specific tool"
         run: |
           # Set environment variables for future steps based on the tool being used. We can't refer to the matrix variables in the env section
