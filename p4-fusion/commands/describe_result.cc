@@ -14,8 +14,7 @@ DescribeResult& DescribeResult::operator=(const DescribeResult& other)
 		return *this;
 	}
 
-	// TODO: std::move?
-	m_FileData = other.m_FileData;
+	m_FileData = std::move(other.m_FileData);
 
 	return *this;
 }
