@@ -5,11 +5,8 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include "p4_api.h"
-
 #include <csignal>
-
 #include "utils/std_helpers.h"
-
 #include "p4/p4libs.h"
 #include "p4/signaler.h"
 #include "minitrace.h"
@@ -185,10 +182,8 @@ ChangesResult P4API::Changes(const std::string& path, const std::string& from, i
 
 	args.push_back(path + pathAddition);
 
-	ChangesResult result = Run<ChangesResult>("changes", args, []() -> ChangesResult
+	return Run<ChangesResult>("changes", args, []() -> ChangesResult
 	    { return {}; });
-
-	return result;
 }
 
 DescribeResult P4API::Describe(const int cl)

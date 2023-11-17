@@ -83,6 +83,8 @@ int Main(int argc, char** argv)
 
 	P4API::P4PORT = arguments.GetPort();
 	P4API::P4USER = arguments.GetUsername();
+	P4API::CommandRetries = arguments.GetRetries();
+	P4API::CommandRefreshThreshold = arguments.GetRefresh();
 
 	P4API p4;
 
@@ -186,8 +188,6 @@ int Main(int argc, char** argv)
 
 	int printBatch = arguments.GetPrintBatch();
 	int lookAhead = arguments.GetLookAhead();
-	P4API::CommandRetries = arguments.GetRetries();
-	P4API::CommandRefreshThreshold = arguments.GetRefresh();
 	bool profiling = false;
 #if MTR_ENABLED
 	profiling = true;

@@ -31,7 +31,6 @@ struct ChangeList
 	ChangeList& operator=(const ChangeList&) = delete;
 	ChangeList(ChangeList&&) = default;
 	ChangeList& operator=(ChangeList&&) = default;
-	~ChangeList() = default;
 
 	void PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branchSet);
 	void StartDownload(P4API& p4, GitAPI& git, const int& printBatch);
@@ -39,7 +38,6 @@ struct ChangeList
 	void Clear();
 
 private:
-	static void Flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileData);
 	std::shared_ptr<std::mutex> commitMutex = std::make_shared<std::mutex>();
 	std::shared_ptr<std::atomic<bool>> downloadJobsCompleted = std::make_shared<std::atomic<bool>>(false);
 	std::shared_ptr<std::condition_variable> commitCV = std::make_shared<std::condition_variable>();

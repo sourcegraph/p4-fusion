@@ -62,54 +62,7 @@ void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branch
 	}
 }
 
-void ChangeList::StartDownload(P4API& p4, GitAPI& git, const int& printBatch)
-{
-	MTR_SCOPE("ChangeList", __func__);
-
-	// wait for prepare to be finished.
-
-	{
-		std::unique_lock<std::mutex> lock(*downloadPreparedMutex);
-		downloadPreparedCV->wait(lock, [this]()
-		    { return downloadPrepared->load(); });
-	}
-
-	std::vector<FileData*> printBatchFileData;
-	// Only perform the group inspection if there are files.
-	if (changedFileGroups->totalFileCount > 0)
-	{
-		for (auto& branchedFileGroup : changedFileGroups->branchedFileGroups)
-		{
-			// Note: the files at this point have already been filtered.
-			for (auto& fileData : branchedFileGroup.files)
-			{
-				if (fileData.IsDownloadNeeded())
-				{
-					fileData.SetPendingDownload();
-					printBatchFileData.push_back(&fileData);
-
-					// Clear the batches if it fits
-					if (printBatchFileData.size() >= printBatch)
-					{
-						Flush(p4, git, printBatchFileData);
-
-						// We let go of the refs held by us and create new ones to queue the next batch
-						printBatchFileData.clear();
-						// Now only the thread job has access to the older batch
-					}
-				}
-			}
-		}
-	}
-
-	// Flush any remaining files that were smaller in number than the total batch size.
-	// Additionally, signal the batch processing end.
-	Flush(p4, git, printBatchFileData);
-	*downloadJobsCompleted = true;
-	commitCV->notify_all();
-}
-
-void ChangeList::Flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileData)
+void flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileData)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -168,6 +121,53 @@ void ChangeList::Flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& pri
 	{
 		printBatchFileData.back()->SetBlobOID(writer.Close());
 	}
+}
+
+void ChangeList::StartDownload(P4API& p4, GitAPI& git, const int& printBatch)
+{
+	MTR_SCOPE("ChangeList", __func__);
+
+	// wait for prepare to be finished.
+
+	{
+		std::unique_lock<std::mutex> lock(*downloadPreparedMutex);
+		downloadPreparedCV->wait(lock, [this]()
+		    { return downloadPrepared->load(); });
+	}
+
+	std::vector<FileData*> printBatchFileData;
+	// Only perform the group inspection if there are files.
+	if (changedFileGroups->totalFileCount > 0)
+	{
+		for (auto& branchedFileGroup : changedFileGroups->branchedFileGroups)
+		{
+			// Note: the files at this point have already been filtered.
+			for (auto& fileData : branchedFileGroup.files)
+			{
+				if (fileData.IsDownloadNeeded())
+				{
+					fileData.SetPendingDownload();
+					printBatchFileData.push_back(&fileData);
+
+					// Clear the batches if it fits
+					if (printBatchFileData.size() >= printBatch)
+					{
+						flush(p4, git, printBatchFileData);
+
+						// We let go of the refs held by us and create new ones to queue the next batch
+						printBatchFileData.clear();
+						// Now only the thread job has access to the older batch
+					}
+				}
+			}
+		}
+	}
+
+	// Flush any remaining files that were smaller in number than the total batch size.
+	// Additionally, signal the batch processing end.
+	flush(p4, git, printBatchFileData);
+	*downloadJobsCompleted = true;
+	commitCV->notify_all();
 }
 
 void ChangeList::WaitForDownload()
