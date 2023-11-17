@@ -85,7 +85,7 @@ echo "::group::{Run p4-fusion against the downloaded depot}"
     --refresh 1000
     --maxChanges -1
     --includeBinaries true
-    --fsyncEnable true
+    --fsyncEnable false
     --noColor true
   )
 
