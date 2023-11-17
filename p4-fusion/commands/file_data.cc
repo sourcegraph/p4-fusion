@@ -28,6 +28,7 @@ FileData::FileData(GitAPI& git, std::string& depotFile, std::string& revision, s
 FileData::~FileData()
 {
 	free(writer);
+	writer = nullptr;
 }
 
 FileData::FileData(const FileData& copy)
@@ -46,6 +47,7 @@ FileData& FileData::operator=(const FileData& other)
 
 	m_data = other.m_data;
 	m_Git = other.m_Git;
+	writer = other.writer;
 	return *this;
 }
 
@@ -82,7 +84,10 @@ void FileData::Write(const char* contents, int length)
 void FileData::Finalize()
 {
 	m_data->blobOID = writer->Close();
-	free(writer);
+	if (writer != nullptr)
+	{
+		free(writer);
+	}
 	writer = nullptr;
 	m_data->isBlobOIDSet = true;
 	m_data->isContentsPendingDownload = false;
