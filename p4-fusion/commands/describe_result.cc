@@ -16,12 +16,13 @@ DescribeResult& DescribeResult::operator=(const DescribeResult& other)
 {
 	if (this == &other)
 	{
-		// guard...
 		return *this;
 	}
 
 	m_Git = other.m_Git;
+	// TODO: std::move?
 	m_FileData = other.m_FileData;
+
 	return *this;
 }
 

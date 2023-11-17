@@ -112,7 +112,7 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 
 		WARN("Retrying: p4 " << command << argsString)
 
-		clientUser = creatorFunc();
+		clientUser = std::move(creatorFunc());
 
 		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
 		m_ClientAPI.Run(command, &clientUser);
