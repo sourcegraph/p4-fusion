@@ -53,4 +53,7 @@ public:
 		std::lock_guard<std::mutex> lock(m_ThreadMutex);
 		return m_Threads.size();
 	}
+
+private:
+	void ForwardException(const std::exception& e);
 };
