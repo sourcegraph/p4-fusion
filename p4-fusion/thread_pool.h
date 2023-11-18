@@ -37,7 +37,7 @@ class ThreadPool
 	std::atomic<bool> m_HasShutDownBeenCalled;
 
 public:
-	ThreadPool(int size, const std::string& repoPath, bool fsyncEnable, int tz);
+	ThreadPool(int size, const std::string& repoPath, int tz);
 	ThreadPool() = delete;
 	~ThreadPool();
 

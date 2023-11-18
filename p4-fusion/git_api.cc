@@ -24,9 +24,13 @@
 		}                                                                      \
 	} while (false)
 
-GitAPI::GitAPI(const std::string& _repoPath, const bool fsyncEnable, const int tz)
+GitAPI::GitAPI(const std::string& _repoPath, const int tz)
     : timezoneMinutes(tz)
     , repoPath(_repoPath)
+{
+}
+
+void GitAPI::Init(const bool fsyncEnable)
 {
 	git_libgit2_init();
 	GIT2(git_libgit2_opts(GIT_OPT_ENABLE_FSYNC_GITDIR, (int)fsyncEnable));

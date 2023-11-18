@@ -51,7 +51,7 @@ class GitAPI
 	std::unordered_map<std::string, git_index*> lastBranchTree;
 
 public:
-	GitAPI(const std::string& repoPath, bool fsyncEnable, int timezoneMinutes);
+	GitAPI(const std::string& repoPath, int timezoneMinutes);
 	GitAPI() = delete;
 	~GitAPI();
 
@@ -59,6 +59,8 @@ public:
 	// blob to the repository's ODB.
 	BlobWriter WriteBlob() const;
 
+	// Init initializes the underlying libgit2 library.
+	void Init(const bool fsyncEnable);
 	void InitializeRepository(bool noCreateBaseCommit);
 	void OpenRepository();
 	bool IsHEADExists() const;

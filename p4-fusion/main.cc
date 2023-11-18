@@ -142,7 +142,9 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	GitAPI git(srcPath, fsyncEnable, timezoneMinutes);
+	GitAPI git(srcPath, timezoneMinutes);
+	// Initialize libgit2.
+	git.Init(fsyncEnable);
 
 	// This throws on error.
 	git.InitializeRepository(arguments.GetNoBaseCommit());
@@ -150,7 +152,7 @@ int Main(int argc, char** argv)
 	// Create the thread pool
 	int networkThreads = arguments.GetNetworkThreads();
 	PRINT("Creating " << networkThreads << " network threads")
-	ThreadPool pool(networkThreads, srcPath, fsyncEnable, timezoneMinutes);
+	ThreadPool pool(networkThreads, srcPath, timezoneMinutes);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
 
 	sigset_t signalsToWaitOn = blockedSignals;

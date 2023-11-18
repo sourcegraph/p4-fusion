@@ -93,7 +93,7 @@ void ThreadPool::ShutDown()
 	SUCCESS("Thread pool shut down successfully")
 }
 
-ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool fsyncEnable, const int tz)
+ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz)
     : m_HasShutDownBeenCalled(false)
 {
 	// Initialize the thread handlers
@@ -101,7 +101,7 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
 
 	for (int i = 0; i < size; i++)
 	{
-		m_Threads.emplace_back([this, i, repoPath, fsyncEnable, tz]()
+		m_Threads.emplace_back([this, i, repoPath, tz]()
 		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
@@ -112,7 +112,7 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const bool f
 			    // internal locks will prevent the threads from working independently.
 			    // We only write blob objects to the ODB, which according to libgit2/libgit2#2491
 			    // is thread safe.
-			    GitAPI git(repoPath, fsyncEnable, tz);
+			    GitAPI git(repoPath, tz);
 
 			    git.OpenRepository();
 
