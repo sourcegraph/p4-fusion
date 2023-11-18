@@ -288,8 +288,6 @@ int p_fsync(int fd)
 {
 	HANDLE fh = (HANDLE)_get_osfhandle(fd);
 
-	p_fsync__cnt++;
-
 	if (fh == INVALID_HANDLE_VALUE) {
 		errno = EBADF;
 		return -1;
