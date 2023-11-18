@@ -49,9 +49,12 @@ class GitAPI
 	std::string repoPath;
 	int timezoneMinutes;
 	std::unordered_map<std::string, git_index*> lastBranchTree;
+	bool m_MainThreadGit;
 
 public:
-	GitAPI(const std::string& repoPath, int timezoneMinutes);
+	static std::mutex repoMutex;
+
+	GitAPI(bool mainThreadGit, const std::string& repoPath, int timezoneMinutes);
 	GitAPI() = delete;
 	~GitAPI();
 

@@ -24,9 +24,10 @@
 		}                                                                      \
 	} while (false)
 
-GitAPI::GitAPI(const std::string& _repoPath, const int tz)
+GitAPI::GitAPI(bool mainThreadGit, const std::string& _repoPath, const int tz)
     : timezoneMinutes(tz)
     , repoPath(_repoPath)
+    , m_MainThreadGit(mainThreadGit)
 {
 }
 
@@ -50,7 +51,11 @@ GitAPI::~GitAPI()
 		git_repository_free(m_Repo);
 		m_Repo = nullptr;
 	}
-	git_libgit2_shutdown();
+
+	if (m_MainThreadGit)
+	{
+		git_libgit2_shutdown();
+	}
 }
 
 bool GitAPI::IsRepositoryClonedFrom(const std::string& depotPath) const
@@ -73,13 +78,20 @@ bool GitAPI::IsRepositoryClonedFrom(const std::string& depotPath) const
 	return repoDepotPath == depotPath;
 }
 
+// Concurrent calls to git_repository_open_bare cause a data race that helgrind complains
+// about so we guard against that.
+std::mutex GitAPI::repoMutex;
+
 void GitAPI::OpenRepository()
 {
+	std::lock_guard<std::mutex> lock(repoMutex);
 	GIT2(git_repository_open_bare(&m_Repo, repoPath.c_str()));
 }
 
 void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
 {
+	std::lock_guard<std::mutex> lock(repoMutex);
+
 	if (git_repository_open_bare(&m_Repo, repoPath.c_str()) < 0)
 	{
 		git_repository_init_options opts = GIT_REPOSITORY_INIT_OPTIONS_INIT;
@@ -403,7 +415,7 @@ BlobWriter::BlobWriter(git_repository* gitRepo)
 
 BlobWriter GitAPI::WriteBlob() const
 {
-	return BlobWriter(m_Repo);
+	return { m_Repo };
 }
 
 void BlobWriter::Write(const char* contents, int length)
@@ -441,5 +453,7 @@ std::string BlobWriter::Close()
 
 	git_oid objId;
 	GIT2(git_blob_create_from_stream_commit(&objId, writer));
-	return git_oid_tostr_s(&objId);
+	auto oid = git_oid_tostr_s(&objId);
+	std::string strOID(oid);
+	return strOID;
 }

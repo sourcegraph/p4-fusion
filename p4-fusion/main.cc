@@ -142,7 +142,7 @@ int Main(int argc, char** argv)
 		return 1;
 	}
 
-	GitAPI git(srcPath, timezoneMinutes);
+	GitAPI git(true, srcPath, timezoneMinutes);
 	// Initialize libgit2.
 	git.Init(fsyncEnable);
 

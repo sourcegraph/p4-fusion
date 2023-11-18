@@ -24,14 +24,14 @@
 
 class P4API
 {
-	ClientApi m_ClientAPI;
+	std::unique_ptr<ClientApi> m_ClientAPI;
 	FileMap m_ClientMapping;
 	int m_Usage = 0;
 
 	bool Initialize();
 	bool Deinitialize();
 	bool Reinitialize();
-	bool CheckErrors(Error& e, StrBuf& msg);
+	bool CheckErrors(Error& e);
 
 	template <class T>
 	T Run(const char* command, const std::vector<std::string>& stringArguments, const std::function<T()>& creatorFunc);
@@ -48,7 +48,7 @@ public:
 	static int CommandRefreshThreshold;
 
 	// Helix Core C++ API seems to crash while making connections parallely.
-	// static std::mutex InitializationMutex;
+	static std::mutex InitializationMutex;
 
 	static bool InitializeLibraries();
 	static bool ShutdownLibraries();
@@ -88,11 +88,11 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 
 	T clientUser = creatorFunc();
 
-	m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
-	m_ClientAPI.Run(command, &clientUser);
+	m_ClientAPI->SetArgv(argsCharArray.size(), argsCharArray.data());
+	m_ClientAPI->Run(command, &clientUser);
 
 	int retries = commandRetries;
-	while (m_ClientAPI.Dropped() || clientUser.GetError().IsError())
+	while (m_ClientAPI->Dropped() || clientUser.GetError().IsError())
 	{
 		if (retries == 0)
 		{
@@ -115,13 +115,13 @@ inline T P4API::RunEx(const char* command, const std::vector<std::string>& strin
 
 		clientUser = std::move(creatorFunc());
 
-		m_ClientAPI.SetArgv(argsCharArray.size(), argsCharArray.data());
-		m_ClientAPI.Run(command, &clientUser);
+		m_ClientAPI->SetArgv(argsCharArray.size(), argsCharArray.data());
+		m_ClientAPI->Run(command, &clientUser);
 
 		retries--;
 	}
 
-	if (m_ClientAPI.Dropped() || clientUser.GetError().IsFatal())
+	if (m_ClientAPI->Dropped() || clientUser.GetError().IsFatal())
 	{
 		ERR("Exiting due to receiving errors even after retrying " << CommandRetries << " times")
 		Deinitialize();
