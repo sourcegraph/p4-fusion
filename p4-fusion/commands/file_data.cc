@@ -55,7 +55,7 @@ void FileData::SetBlobOID(std::string&& blobOID)
 {
 	std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
 
-	if (m_data->blobOID == nullptr)
+	if (m_data->blobOID != nullptr)
 	{
 		// Do not set the contents.  Assume that
 		// they were already set or, worst case, are currently being set.
