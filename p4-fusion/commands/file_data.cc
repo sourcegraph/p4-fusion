@@ -12,7 +12,6 @@ FileDataStore::FileDataStore(std::string& _depotFile, std::string& _revision, st
     , revision(_revision)
     , isBinary(STDHelpers::Contains(type, "binary"))
     , isExecutable(STDHelpers::Contains(type, "+x"))
-    , isBlobOIDSet(false)
     , isContentsPendingDownload(false)
 {
 	SetAction(action);
@@ -54,21 +53,24 @@ void FileData::SetFromDepotFile(const std::string& fromDepotFile, const std::str
 
 void FileData::SetBlobOID(std::string&& blobOID)
 {
-	if (m_data->isBlobOIDSet)
+	std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
+
+	if (m_data->blobOID == nullptr)
 	{
 		// Do not set the contents.  Assume that
 		// they were already set or, worst case, are currently being set.
 		return;
 	}
 
-	m_data->blobOID = std::move(blobOID);
-	m_data->isBlobOIDSet = true;
+	m_data->blobOID = std::make_unique<std::string>(std::move(blobOID));
 	m_data->isContentsPendingDownload = false;
 }
 
 void FileData::SetPendingDownload()
 {
-	if (!m_data->isBlobOIDSet)
+	std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
+
+	if (m_data->blobOID == nullptr)
 	{
 		m_data->isContentsPendingDownload = true;
 	}
@@ -123,7 +125,7 @@ void FileDataStore::Clear()
 	revision.clear();
 	fromDepotFile.clear();
 	fromRevision.clear();
-	blobOID.clear();
+	blobOID = nullptr;
 	relativePath.clear();
 }
 

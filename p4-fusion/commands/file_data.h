@@ -45,8 +45,8 @@ struct FileDataStore
 	std::string fromRevision;
 
 	// git blob data
-	std::string blobOID;
-	std::atomic<bool> isBlobOIDSet;
+	std::unique_ptr<std::string> blobOID;
+	std::mutex blobOIDMu;
 	std::atomic<bool> isContentsPendingDownload;
 
 	// Derived Values
@@ -81,18 +81,23 @@ public:
 
 	void SetBlobOID(std::string&& blobOID);
 	void SetPendingDownload();
-	bool IsDownloadNeeded() const { return !m_data->isBlobOIDSet && !m_data->isContentsPendingDownload; };
+	bool IsDownloadNeeded() const
+	{
+		std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
+		return m_data->blobOID != nullptr && !m_data->isContentsPendingDownload;
+	};
 
 	const std::string& GetDepotFile() const { return m_data->depotFile; };
 	const std::string& GetRevision() const { return m_data->revision; };
 	const std::string& GetRelativePath() const { return m_data->relativePath; };
 	const std::string& GetBlobOID() const
 	{
-		if (!m_data->isBlobOIDSet)
+		std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
+		if (m_data->blobOID == nullptr)
 		{
 			throw std::runtime_error("Tried to access blob OID before it was set");
 		}
-		return m_data->blobOID;
+		return *m_data->blobOID;
 	};
 	bool IsDeleted() const { return m_data->isDeleted; };
 	bool IsIntegrated() const { return m_data->isIntegrated; };

@@ -8,20 +8,20 @@
 
 #include <utility>
 
-PrintResult::PrintResult(std::function<void()> stat, std::function<void(const char*, int)> out)
-    : onStat(std::move(stat))
-    , onOutput(std::move(out))
+PrintResult::PrintResult(std::function<void()> _onNextFile, std::function<void(const char*, int)> _onFileContentChunk)
+    : onNextFile(std::move(_onNextFile))
+    , onFileContentChunk(std::move(_onFileContentChunk))
 {
 }
 
 void PrintResult::OutputStat(StrDict* varList)
 {
-	onStat();
+	onNextFile();
 }
 
 void PrintResult::OutputText(const char* data, int length)
 {
-	onOutput(data, length);
+	onFileContentChunk(data, length);
 }
 
 void PrintResult::OutputBinary(const char* data, int length)

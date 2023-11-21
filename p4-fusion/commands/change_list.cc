@@ -24,7 +24,7 @@ ChangeList::ChangeList(const int& clNumber, std::string&& clDescription, std::st
 {
 }
 
-void ChangeList::PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branchSet)
+void ChangeList::PrepareDownload(P4API& p4, const BranchSet& branchSet)
 {
 	MTR_SCOPE("ChangeList", __func__);
 
@@ -90,8 +90,7 @@ void flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileD
 	// file begins here", and then for small chunks of data of that file.
 	long idx = -1;
 	BlobWriter writer = git.WriteBlob();
-	PrintResult printResp = p4.PrintFiles(
-	    fileRevisions, [&idx, &writer, &git, &printBatchFileData]
+	std::function<void()> onNextFile([&idx, &writer, &git, &printBatchFileData]
 	    {
 			// For the first file, we don't need to run finalize on the previous
 			// file so we're done here.
@@ -105,12 +104,15 @@ void flush(P4API& p4, GitAPI& git, const std::vector<FileData*>& printBatchFileD
 			// Now step one file further.
 		    idx++;
 			// And start a write for the next file.
-		    writer = git.WriteBlob(); },
-	    [&writer](const char* contents, int length)
+		    writer = git.WriteBlob(); });
+
+	std::function<void(const char*, int)> onWrite([&writer](const char* contents, int length)
 	    {
 		    // Write a chunk of the data to the currently processed file.
-		    writer.Write(contents, length);
-	    });
+		    writer.Write(contents, length); });
+
+	PrintResult printResp
+	    = p4.PrintFiles(fileRevisions, onNextFile, onWrite);
 	if (printResp.HasError())
 	{
 		throw std::runtime_error(printResp.PrintError());

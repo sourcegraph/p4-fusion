@@ -403,7 +403,12 @@ BlobWriter::BlobWriter(git_repository* gitRepo)
 
 BlobWriter GitAPI::WriteBlob() const
 {
-	return BlobWriter(m_Repo);
+	if (m_Repo == nullptr)
+	{
+		throw std::runtime_error("created blob writer before opening repository");
+	}
+
+	return { m_Repo };
 }
 
 void BlobWriter::Write(const char* contents, int length)

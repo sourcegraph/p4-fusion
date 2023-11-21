@@ -32,7 +32,7 @@ struct ChangeList
 	ChangeList(ChangeList&&) = default;
 	ChangeList& operator=(ChangeList&&) = default;
 
-	void PrepareDownload(P4API& p4, GitAPI& git, const BranchSet& branchSet);
+	void PrepareDownload(P4API& p4, const BranchSet& branchSet);
 	void StartDownload(P4API& p4, GitAPI& git, const int& printBatch);
 	void WaitForDownload();
 	void Clear();
