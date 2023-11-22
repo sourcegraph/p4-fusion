@@ -45,7 +45,7 @@ struct FileDataStore
 	std::string fromRevision;
 
 	// git blob data
-	std::unique_ptr<std::string> blobOID;
+	std::unique_ptr<std::string> blobOID = nullptr;
 	std::mutex blobOIDMu;
 	std::atomic<bool> isContentsPendingDownload;
 
@@ -84,7 +84,7 @@ public:
 	bool IsDownloadNeeded() const
 	{
 		std::lock_guard<std::mutex> lock(m_data->blobOIDMu);
-		return m_data->blobOID != nullptr && !m_data->isContentsPendingDownload;
+		return m_data->blobOID == nullptr && !m_data->isContentsPendingDownload;
 	};
 
 	const std::string& GetDepotFile() const { return m_data->depotFile; };
