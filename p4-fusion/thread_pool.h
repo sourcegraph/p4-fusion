@@ -15,6 +15,7 @@
 #include "common.h"
 #include "p4_api.h"
 #include "git_api.h"
+#include "thread.h"
 
 class P4API;
 
@@ -22,6 +23,7 @@ typedef std::function<void(P4API&, GitAPI&)> Job;
 
 class ThreadPool
 {
+private:
 	mutable std::mutex m_ThreadMutex;
 	std::vector<std::thread> m_Threads;
 	std::mutex m_ThreadExceptionsMutex;
@@ -35,6 +37,8 @@ class ThreadPool
 
 	std::mutex m_ShutdownMutex;
 	std::atomic<bool> m_HasShutDownBeenCalled;
+
+	ThreadRAII exceptionHandlingThread;
 
 public:
 	ThreadPool(int size, const std::string& repoPath, int tz);

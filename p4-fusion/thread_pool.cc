@@ -8,6 +8,7 @@
 #include "common.h"
 #include "p4_api.h"
 #include "minitrace.h"
+#include "thread.h"
 #include "git_api.h"
 
 void ThreadPool::AddJob(Job&& function)
@@ -54,6 +55,7 @@ void ThreadPool::ShutDown()
 	std::lock_guard<std::mutex> shutdownLock(m_ShutdownMutex); // Prevent multiple threads from shutting down the pool.
 	if (m_HasShutDownBeenCalled) // We've already shut down.
 	{
+		WARN("ThreadPool has already been shut down")
 		return;
 	}
 
@@ -64,7 +66,6 @@ void ThreadPool::ShutDown()
 	}
 
 	m_CV.notify_all(); // Tell all the worker threads to stop waiting for new jobs.
-	m_ThreadExceptionCV.notify_all(); // Tell the exception handler to stop waiting for new exceptions.
 
 	// Wait for all worker threads to finish, then release them.
 	{
@@ -84,17 +85,36 @@ void ThreadPool::ShutDown()
 		m_Jobs.clear();
 	}
 
+	SUCCESS("Thread pool shut down successfully")
+
+	// Now as the last step, stop the exception handling thread:
+
+	m_ThreadExceptionCV.notify_all(); // Tell the exception handler to stop waiting for new exceptions.
+
 	// Clear the exception queue.
 	{
 		std::lock_guard<std::mutex> lock(m_ThreadExceptionsMutex);
 		m_ThreadExceptions.clear();
 	}
-
-	SUCCESS("Thread pool shut down successfully")
 }
 
 ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz)
     : m_HasShutDownBeenCalled(false)
+    , exceptionHandlingThread(std::thread([this]()
+          {
+			// See if the threadpool encountered any exceptions.
+			try
+			{
+				RaiseCaughtExceptions();
+			}
+			catch (const std::exception& e)
+			{
+				// This is unrecoverable
+				ERR("Threadpool encountered an exception: " << e.what())
+				ShutDown();
+				std::exit(1);
+			}
+	    SUCCESS("Exception handler finished") }))
 {
 	// Initialize the thread handlers
 	std::lock_guard<std::mutex> threadsLock(m_ThreadMutex);
