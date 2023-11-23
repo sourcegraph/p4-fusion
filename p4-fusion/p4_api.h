@@ -24,6 +24,11 @@
 
 class P4API
 {
+private:
+	// Helix Core C++ API doesn't seem to be fully thread-safe when creating a new
+	// client with SSL, so let's initialize them in sequence.
+	static std::mutex InitializationMutex;
+
 	ClientApi m_ClientAPI;
 	FileMap m_ClientMapping;
 	int m_Usage = 0;
@@ -46,9 +51,6 @@ public:
 	static ClientResult::ClientSpecData ClientSpec;
 	static int CommandRetries;
 	static int CommandRefreshThreshold;
-
-	// Helix Core C++ API seems to crash while making connections parallely.
-	// static std::mutex InitializationMutex;
 
 	static bool InitializeLibraries();
 	static bool ShutdownLibraries();

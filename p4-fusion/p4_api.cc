@@ -17,6 +17,7 @@ std::string P4API::P4USER;
 std::string P4API::P4CLIENT;
 int P4API::CommandRetries = 1;
 int P4API::CommandRefreshThreshold = 1;
+std::mutex P4API::InitializationMutex;
 
 P4API::P4API()
 {
@@ -36,12 +37,15 @@ bool P4API::Initialize()
 	Error e;
 	StrBuf msg;
 
-	m_Usage = 0;
-	m_ClientAPI.SetPort(P4PORT.c_str());
-	m_ClientAPI.SetUser(P4USER.c_str());
-	m_ClientAPI.SetClient(P4CLIENT.c_str());
-	m_ClientAPI.SetProtocol("tag", "");
-	m_ClientAPI.Init(&e);
+	{
+		std::lock_guard<std::mutex> lock(InitializationMutex);
+		m_Usage = 0;
+		m_ClientAPI.SetPort(P4PORT.c_str());
+		m_ClientAPI.SetUser(P4USER.c_str());
+		m_ClientAPI.SetClient(P4CLIENT.c_str());
+		m_ClientAPI.SetProtocol("tag", "");
+		m_ClientAPI.Init(&e);
+	}
 
 	if (!CheckErrors(e, msg))
 	{
