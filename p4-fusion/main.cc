@@ -208,7 +208,7 @@ int Main(int argc, char** argv)
 		ChangeList& cl = changes.at(currentCL);
 
 		pool.AddJob([&cl, &branchSet](P4API& p4, GitAPI& git)
-			{ cl.PrepareDownload(p4, branchSet); });
+		    { cl.PrepareDownload(p4, branchSet); });
 	}
 
 	for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
