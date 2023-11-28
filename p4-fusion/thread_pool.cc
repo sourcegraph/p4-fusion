@@ -93,7 +93,7 @@ void ThreadPool::ShutDown()
 	}
 }
 
-ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz)
+ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz, P4API& p4)
     : m_HasShutDownBeenCalled(false)
     , exceptionHandlingThread(std::thread([this]()
           {
@@ -116,9 +116,7 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz
 
 	for (int i = 0; i < size; i++)
 	{
-		// Initialize P4API here so we synchronously create them.
-		std::shared_ptr<P4API> p4 = std::make_shared<P4API>();
-		m_Threads.emplace_back([this, i, repoPath, p4, tz]()
+		m_Threads.emplace_back([this, i, repoPath, &p4, tz]()
 		    {
 				// Add some human-readable info to the tracing.
 				MTR_META_THREAD_NAME(("Worker #" + std::to_string(i)).c_str());
@@ -153,7 +151,7 @@ ThreadPool::ThreadPool(const int size, const std::string& repoPath, const int tz
 
 					try
 					{
-						job(*p4, git);
+						job(p4, git);
 					}
 					catch (const std::exception& e)
 					{

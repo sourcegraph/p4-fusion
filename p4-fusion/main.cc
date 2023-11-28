@@ -185,7 +185,7 @@ int Main(int argc, char** argv)
 		networkThreads = int(changes.size());
 	}
 	PRINT("Creating " << networkThreads << " network threads")
-	ThreadPool pool(networkThreads, srcPath, timezoneMinutes);
+	ThreadPool pool(networkThreads, srcPath, timezoneMinutes, p4);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
 
 	// Block signals from being handled by the main thread, and all future threads.

@@ -41,7 +41,7 @@ private:
 	ThreadRAII exceptionHandlingThread;
 
 public:
-	ThreadPool(int size, const std::string& repoPath, int tz);
+	ThreadPool(int size, const std::string& repoPath, int tz, P4API& p4);
 	ThreadPool() = delete;
 	~ThreadPool();
 
