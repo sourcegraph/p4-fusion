@@ -35,10 +35,19 @@ private:
 
 	std::condition_variable m_CV;
 
-	std::mutex m_ShutdownMutex;
+	std::once_flag m_ShutdownFlag;
 	std::atomic<bool> m_HasShutDownBeenCalled;
 
 	ThreadRAII exceptionHandlingThread;
+	std::once_flag startExceptionHandlingThread_Flag;
+
+	ThreadRAII signalHandlingThread;
+	std::once_flag m_startSignalHandlingThread_Flag;
+	std::once_flag m_shutdownSignalHandlingThread_Flag;
+
+	void startExceptionHandlingThread();
+	void startSignalHandlingThread();
+	void shutdownSignalHandlingThread();
 
 public:
 	ThreadPool(int size, const std::string& repoPath, int tz);

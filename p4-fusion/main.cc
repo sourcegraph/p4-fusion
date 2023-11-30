@@ -19,7 +19,6 @@
 #include "git_api.h"
 #include "branch_set.h"
 #include "tracer.h"
-#include "signalhandler.h"
 
 #include "p4/p4libs.h"
 
@@ -188,10 +187,6 @@ int Main(int argc, char** argv)
 	PRINT("Creating " << networkThreads << " network threads")
 	ThreadPool pool(networkThreads, srcPath, timezoneMinutes);
 	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
-
-	// Block signals from being handled by the main thread, and all future threads.
-	// TODO: This should ideally happen further up in the stack.
-	SignalHandler sigHand(pool);
 
 	// Go in the chronological order.
 	std::atomic<int> downloaded;
