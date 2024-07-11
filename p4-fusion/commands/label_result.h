@@ -14,6 +14,7 @@ class LabelResult : public Result
 public:
 	std::string label;
 	std::string revision;
+	std::string description;
 	std::vector<std::string> views;
 
 public:

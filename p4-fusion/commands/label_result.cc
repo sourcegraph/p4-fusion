@@ -10,6 +10,7 @@ void LabelResult::OutputStat(StrDict* varList)
 {
 	StrPtr* labelPtr = varList->GetVar("Label");
 	StrPtr* revisionPtr = varList->GetVar("Revision");
+	StrPtr* descriptionPtr = varList->GetVar("Description");
 
 	if (!labelPtr || !revisionPtr)
 	{
@@ -20,6 +21,7 @@ void LabelResult::OutputStat(StrDict* varList)
 
 	label = labelPtr->Text();
 	revision = revisionPtr->Text();
+	description = descriptionPtr->Text();
 
 	int i = 0;
 	StrPtr* view;

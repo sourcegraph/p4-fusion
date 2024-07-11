@@ -17,10 +17,5 @@ void LabelsResult::OutputStat(StrDict* varList)
 		return;
 	}
 
-	LabelID labelID = labelIDPtr->Text();
-	LabelData labelData;
-
-	labelData.label = labelIDPtr->Text();
-
-	m_Labels.insert({ labelID, labelData });
+	m_Labels.emplace_back(labelIDPtr->Text());
 }

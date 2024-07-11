@@ -8,22 +8,14 @@
 
 #include "common.h"
 #include "result.h"
+#include <list>
 
 class LabelsResult : public Result
 {
-public:
-	using LabelID = std::string;
-
-	struct LabelData
-	{
-		std::string label;
-	};
-
-private:
-	std::unordered_map<LabelID, LabelData> m_Labels;
+	std::list<std::string> m_Labels;
 
 public:
-	[[nodiscard]] const std::unordered_map<LabelID, LabelData>& GetLabels() const { return m_Labels; }
+	[[nodiscard]] const std::list<std::string>& GetLabels() const { return m_Labels; }
 
 	void OutputStat(StrDict* varList) override;
 };

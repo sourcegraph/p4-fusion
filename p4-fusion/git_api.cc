@@ -168,6 +168,12 @@ void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
 	}
 }
 
+git_repository* GitAPI::GetRepoPtr()
+{
+	return m_Repo;
+}
+
+
 bool GitAPI::IsHEADExists() const
 {
 	MTR_SCOPE("Git", __func__);

@@ -68,6 +68,8 @@ public:
 	GitAPI() = delete;
 	~GitAPI();
 
+	git_repository* GetRepoPtr();
+
 	// WriteBlob returns a new BlobWriter instance that allows to write a single
 	// blob to the repository's ODB.
 	[[nodiscard]] BlobWriter WriteBlob() const;
