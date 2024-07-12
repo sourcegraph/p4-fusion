@@ -8,12 +8,7 @@ endif ()
 set(OPENSSL_USE_STATIC_LIBS true)
 find_package(OpenSSL)
 
-add_executable(p4-fusion ${Headers} ${Sources}
-        commands/labels_result.cc
-        commands/labels_result.h
-        commands/label_result.h
-        labels_conversion.cpp
-        labels_conversion.h)
+add_executable(p4-fusion ${Headers} ${Sources})
 
 target_include_directories(p4-fusion PUBLIC
         ../${HELIX_API}/include/

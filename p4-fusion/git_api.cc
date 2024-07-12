@@ -97,11 +97,6 @@ void GitAPI::OpenRepository()
 	checkGit2Error(git_repository_open_bare(&m_Repo, repoPath.c_str()));
 }
 
-void GitAPI::CloseRepository()
-{
-	free(m_Repo);
-}
-
 void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
 {
 	std::lock_guard<std::mutex> lock(repoMutex);
@@ -406,7 +401,7 @@ std::string GitAPI::WriteChangelistBranch(
 
 		// Next, write the commit object and point targetBranchRef to it.
 		git_oid commitID;
-		checkGit2Error(git_commit_create(&commitID, m_Repo, targetBranchRef.c_str(), author, author, NULL, commitMsg.c_str(), commitTree, parentCount, (const git_commit**)parents));
+		checkGit2Error(git_commit_create(&commitID, m_Repo, targetBranchRef.c_str(), author, author, "UTF-8", commitMsg.c_str(), commitTree, parentCount, (const git_commit**)parents));
 
 		for (int i = 0; i < parentCount; i++)
 		{

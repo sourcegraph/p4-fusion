@@ -1,7 +1,3 @@
-//
-// Created by Petri-Johan Last on 2024/07/11.
-//
-
 #ifndef LABELS_CONVERSION_H
 #define LABELS_CONVERSION_H
 #include "p4_api.h"
