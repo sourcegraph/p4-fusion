@@ -173,9 +173,9 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 			PRINT("Tag has moved or no longer exists, deleting: " << labelName)
 			checkGit2Error(git_reference_delete(ref));
 		}
+		git_reference_free(ref);
 	}
 	git_reference_iterator_free(refIter);
-	git_reference_free(ref);
 
 	PRINT("Creating new tags, if any...")
 
