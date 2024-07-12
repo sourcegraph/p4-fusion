@@ -78,6 +78,7 @@ public:
 
 	void InitializeRepository(bool noCreateBaseCommit);
 	void OpenRepository();
+	void CloseRepository();
 	[[nodiscard]] bool IsHEADExists() const;
 	[[nodiscard]] bool IsRepositoryClonedFrom(const std::string& depotPath) const;
 	/* Checks if a previous commit was made and extracts the corresponding changelist number. */

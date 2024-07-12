@@ -157,6 +157,7 @@ int Main(int argc, char** argv)
 	{
 		SUCCESS("Repository is up to date. Updating tags.")
 		updateTags(&p4, depotPath, git.GetRepoPtr());
+		git.CloseRepository();
 		return 0;
 	}
 	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number)
@@ -304,6 +305,7 @@ int Main(int argc, char** argv)
 	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
 
 	updateTags(&p4, depotPath, git.GetRepoPtr());
+	git.CloseRepository();
 
 	return 0;
 }

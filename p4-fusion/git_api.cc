@@ -97,6 +97,11 @@ void GitAPI::OpenRepository()
 	checkGit2Error(git_repository_open_bare(&m_Repo, repoPath.c_str()));
 }
 
+void GitAPI::CloseRepository()
+{
+	free(m_Repo);
+}
+
 void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
 {
 	std::lock_guard<std::mutex> lock(repoMutex);
