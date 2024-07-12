@@ -303,7 +303,8 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
 
-	updateTags(&p4, depotPath, git.GetRepoPtr());
+	P4API tagsClient;
+	updateTags(&tagsClient, depotPath, git.GetRepoPtr());
 
 	return 0;
 }
