@@ -6,7 +6,6 @@
  */
 #include <thread>
 #include <atomic>
-#include <sstream>
 #include <unordered_map>
 #include <typeinfo>
 
@@ -17,204 +16,13 @@
 
 #include "thread_pool.h"
 #include "p4_api.h"
+#include "labels_conversion.h"
 #include "git_api.h"
 #include "branch_set.h"
 #include "tracer.h"
 #include "git2/commit.h"
-#include "git2/refs.h"
-#include "git2/repository.h"
-
-#include "p4/p4libs.h"
 
 #define P4_FUSION_VERSION "v1.13.2-sg"
-
-std::string sanitizeLabelName(std::string label) {
-	// Remove leading slashes
-	while (!label.empty() && label.front() == '/') {
-		label.erase(label.begin());
-	}
-
-	// Remove trailing slashes and dots
-	while (!label.empty() && (label.back() == '/' || label.back() == '.')) {
-		label.pop_back();
-	}
-
-	// Replace specific characters with underscores
-	std::string charsToReplace = " ~^:?*[@{";
-	for (char& ch : label) {
-		if (charsToReplace.find(ch) != std::string::npos) {
-			ch = '_';
-		}
-	}
-
-	// Replace "//" with "/"
-	std::string doubleSlash = "//";
-	std::string singleSlash = "/";
-	std::string::size_type pos = 0;
-	while ((pos = label.find(doubleSlash, pos)) != std::string::npos) {
-		label.replace(pos, doubleSlash.length(), singleSlash);
-	}
-
-	// If the label is exactly "@", return an empty string
-	if (label == "@") {
-		return "";
-	}
-
-	return label;
-}
-
-// Function to trim the specified suffix from the string
-std::string trimSuffix(const std::string& str, const std::string& suffix) {
-	if (str.size() >= suffix.size() &&
-		str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0) {
-		return str.substr(0, str.size() - suffix.size());
-		}
-	return str;
-}
-
-// Function to trim the specified prefix from the string
-std::string trimPrefix(const std::string& str, const std::string& prefix) {
-	if (str.size() >= prefix.size() &&
-		str.compare(0, prefix.size(), prefix) == 0) {
-		return str.substr(prefix.size());
-		}
-	return str;
-}
-
-std::string getChangelistFromCommit(git_repository* repo, git_commit* commit)
-{
-	// Look for the specific change message generated from the Commit method.
-	// Note that extra branching information can be added after it.
-	// ": change = " is 11 characters long.
-	std::string message = git_commit_message(commit);
-	size_t pos = message.find(": change = ");
-	if (pos == std::string::npos)
-	{
-		throw std::invalid_argument("failed to parse commit message, well known section : change =  not found");
-	}
-	// The changelist number starts after 11 characters, the length of ": change = ".
-	size_t clStart = pos + 11;
-	size_t clEnd = message.find(']', clStart);
-	if (clEnd == std::string::npos)
-	{
-		throw std::invalid_argument("failed to parse commit message, well closing ] not found");
-	}
-
-	std::string cl(message, clStart, clEnd - clStart);
-
-	return cl;
-}
-
-int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
-{
-	PRINT("Updatings tags")
-
-	// Load labels
-	PRINT("Requesting labels from the Perforce server")
-	LabelsResult labelsRes = p4->Labels();
-	if (labelsRes.HasError())
-	{
-		ERR("Failed to retrieve labels for mapping: " << labelsRes.PrintError())
-		return 1;
-	}
-	const std::list<std::string>& labels = labelsRes.GetLabels();
-	SUCCESS("Received " << labels.size() << " labels from the Perforce server")
-
-	std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel;
-
-	for (auto& label: labelsRes.GetLabels()) {
-		LabelResult labelRes = p4->Label(label);
-		if (labelRes.HasError())
-		{
-			ERR("Failed to retrieve label details: " << labelRes.PrintError());
-			continue;
-		}
-		if (!labelRes.revision.starts_with("@"))
-		{
-			continue;
-		}
-		labelRes.revision.erase(labelRes.revision.begin());
-		if (labelRes.views.empty())
-		{
-			if (!revToLabel.contains(labelRes.revision))
-			{
-				auto* newMap = new std::unordered_map<std::string, LabelResult>;
-				revToLabel.insert({labelRes.revision, newMap});
-			}
-			auto res = revToLabel.at(labelRes.revision);
-			res->insert({sanitizeLabelName(labelRes.label), labelRes});
-		} else
-		{
-			for (auto& view: labelRes.views)
-			{
-				if (depotPath.starts_with(trimSuffix(view, "...")))
-				{
-					if (!revToLabel.contains(labelRes.revision))
-					{
-						auto* newMap = new std::unordered_map<std::string, LabelResult>;
-						revToLabel.insert({labelRes.revision, newMap});
-					}
-					auto res = revToLabel.at(labelRes.revision);
-					res->insert({sanitizeLabelName(labelRes.label), labelRes});
-				}
-			}
-		}
-	}
-
-
-	git_reference_iterator* refIter;
-	git_reference_iterator_glob_new(&refIter, repo, "refs/tags/*");
-	git_reference* ref;
-	while (git_reference_next(&ref, refIter) >= 0)
-	{
-		std::string labelName = trimPrefix(git_reference_name(ref), "refs/tags/");
-
-		git_commit* commit;
-		git_commit_lookup(&commit, repo, git_reference_target(ref));
-		std::string cl = getChangelistFromCommit(repo, commit);
-		if (revToLabel.contains(cl) && revToLabel.at(cl)->contains(labelName))
-		{
-			revToLabel.at(cl)->erase(labelName);
-			if (revToLabel.at(cl)->empty())
-			{
-				revToLabel.erase(cl);
-			}
-		} else
-		{
-			PRINT("Tag has moved or no longer exists, deleting: " << labelName)
-			git_reference_delete(ref);
-		}
-	}
-
-	PRINT("Creating new tags, if any...")
-
-	git_reference* head;
-	git_repository_head(&head, repo);
-
-	git_commit* commit;
-	git_commit_lookup(&commit, repo, git_reference_target(head));
-
-	while (true)
-	{
-		std::string clID = getChangelistFromCommit(repo, commit);
-		if (revToLabel.contains(clID))
-		{
-			for (auto& [_, v]: *revToLabel.at(clID))
-			{
-				SUCCESS("Creating tag " << sanitizeLabelName(v.label) << " for CL " << clID)
-				git_reference* tmpref;
-				git_reference_create(&tmpref, repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(commit), false, v.description.c_str());
-			}
-		}
-		if (git_commit_parentcount(commit) == 0)
-		{
-			break;
-		}
-		git_commit_parent(&commit, commit, 0);
-	}
-
-	return 0;
-}
 
 int Main(int argc, char** argv)
 {
@@ -398,10 +206,11 @@ int Main(int argc, char** argv)
 		nextToEnqueue++;
 
 		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
-		    {
+		{
 			cl.StartDownload(p4, git, branchSet, printBatch);
 			// Mark download as done.
-			downloaded++; });
+			downloaded++;
+		});
 	}
 
 	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(startupDownloadsCount - 1).number << " for downloading")
@@ -444,13 +253,13 @@ int Main(int argc, char** argv)
 			}
 
 			const std::string& commitSHA = git.WriteChangelistBranch(
-			    depotPath,
-			    cl,
-			    branchGroup.files,
-			    branchGroup.targetBranch,
-			    fullName,
-			    email,
-			    mergeFrom);
+				depotPath,
+				cl,
+				branchGroup.files,
+				branchGroup.targetBranch,
+				fullName,
+				email,
+				mergeFrom);
 
 #ifdef PRINT_TEST_OUTPUT
 			// For scripting/testing purposes...
@@ -459,23 +268,23 @@ int Main(int argc, char** argv)
 			if (branchSet.Count() > 0)
 			{
 				SUCCESS(
-				    "CL " << cl.number << " --> Commit " << commitSHA
-				          << " with " << branchGroup.files.size() << " files"
-				          << (branchGroup.targetBranch.empty()
-				                     ? ""
-				                     : (" to branch " + branchGroup.targetBranch))
-				          << (branchGroup.sourceBranch.empty()
-				                     ? ""
-				                     : (" from branch " + branchGroup.sourceBranch))
-				          << ".")
+					"CL " << cl.number << " --> Commit " << commitSHA
+					<< " with " << branchGroup.files.size() << " files"
+					<< (branchGroup.targetBranch.empty()
+						? ""
+						: (" to branch " + branchGroup.targetBranch))
+					<< (branchGroup.sourceBranch.empty()
+						? ""
+						: (" from branch " + branchGroup.sourceBranch))
+					<< ".")
 			}
 		}
 		SUCCESS(
-		    "CL " << cl.number << " with "
-		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
-		          << "|" << downloaded
-		          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
-		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
+			"CL " << cl.number << " with "
+			<< cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
+			<< "|" << downloaded
+			<< "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
+			<< ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
 
 		i++;
 
@@ -486,10 +295,11 @@ int Main(int argc, char** argv)
 			ChangeList& downloadCL = changes.at(nextToEnqueue - i);
 			nextToEnqueue++;
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
-			    {
+			{
 				downloadCL.StartDownload(p4, git, branchSet, printBatch);
 				// Mark download as done.
-				downloaded++; });
+				downloaded++;
+			});
 		}
 	}
 

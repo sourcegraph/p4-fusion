@@ -18,6 +18,8 @@
 
 struct git_repository;
 
+void checkGit2Error(int);
+
 class BlobWriter
 {
 private:
