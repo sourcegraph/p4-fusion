@@ -51,8 +51,7 @@ std::string sanitizeLabelName(std::string label)
 // Function to trim the specified suffix from the string
 std::string trimSuffix(const std::string& str, const std::string& suffix)
 {
-	if (str.size() >= suffix.size() &&
-		str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0)
+	if (str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0)
 	{
 		return str.substr(0, str.size() - suffix.size());
 	}
@@ -62,8 +61,7 @@ std::string trimSuffix(const std::string& str, const std::string& suffix)
 // Function to trim the specified prefix from the string
 std::string trimPrefix(const std::string& str, const std::string& prefix)
 {
-	if (str.size() >= prefix.size() &&
-		str.compare(0, prefix.size(), prefix) == 0)
+	if (str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0)
 	{
 		return str.substr(prefix.size());
 	}

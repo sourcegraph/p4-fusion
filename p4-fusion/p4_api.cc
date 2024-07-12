@@ -242,17 +242,17 @@ UsersResult P4API::Users()
 
 LabelsResult P4API::Labels()
 {
-	return Run<LabelsResult>("labels", {"-a"}, []() -> LabelsResult { return {}; });
+	return Run<LabelsResult>("labels", { "-a" }, []() -> LabelsResult
+	    { return {}; });
 }
 
 LabelResult P4API::Label(const std::string& labelName)
 {
 	MTR_SCOPE("P4", __func__);
 
-	return Run<LabelResult>("label", { "-o",
-											   labelName },
-		[]() -> LabelResult
-		{ return {}; });
+	return Run<LabelResult>("label", { "-o", labelName },
+	    []() -> LabelResult
+	    { return {}; });
 }
 
 InfoResult P4API::Info()

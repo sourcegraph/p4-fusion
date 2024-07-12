@@ -8,4 +8,4 @@
 
 int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo);
 
-#endif //LABELS_CONVERSION_H
+#endif // LABELS_CONVERSION_H

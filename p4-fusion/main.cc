@@ -206,11 +206,10 @@ int Main(int argc, char** argv)
 		nextToEnqueue++;
 
 		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
-		{
+		    {
 			cl.StartDownload(p4, git, branchSet, printBatch);
 			// Mark download as done.
-			downloaded++;
-		});
+			downloaded++; });
 	}
 
 	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(startupDownloadsCount - 1).number << " for downloading")
@@ -253,13 +252,13 @@ int Main(int argc, char** argv)
 			}
 
 			const std::string& commitSHA = git.WriteChangelistBranch(
-				depotPath,
-				cl,
-				branchGroup.files,
-				branchGroup.targetBranch,
-				fullName,
-				email,
-				mergeFrom);
+			    depotPath,
+			    cl,
+			    branchGroup.files,
+			    branchGroup.targetBranch,
+			    fullName,
+			    email,
+			    mergeFrom);
 
 #ifdef PRINT_TEST_OUTPUT
 			// For scripting/testing purposes...
@@ -268,23 +267,23 @@ int Main(int argc, char** argv)
 			if (branchSet.Count() > 0)
 			{
 				SUCCESS(
-					"CL " << cl.number << " --> Commit " << commitSHA
-					<< " with " << branchGroup.files.size() << " files"
-					<< (branchGroup.targetBranch.empty()
-						? ""
-						: (" to branch " + branchGroup.targetBranch))
-					<< (branchGroup.sourceBranch.empty()
-						? ""
-						: (" from branch " + branchGroup.sourceBranch))
-					<< ".")
+				    "CL " << cl.number << " --> Commit " << commitSHA
+				          << " with " << branchGroup.files.size() << " files"
+				          << (branchGroup.targetBranch.empty()
+				                     ? ""
+				                     : (" to branch " + branchGroup.targetBranch))
+				          << (branchGroup.sourceBranch.empty()
+				                     ? ""
+				                     : (" from branch " + branchGroup.sourceBranch))
+				          << ".")
 			}
 		}
 		SUCCESS(
-			"CL " << cl.number << " with "
-			<< cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
-			<< "|" << downloaded
-			<< "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
-			<< ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
+		    "CL " << cl.number << " with "
+		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
+		          << "|" << downloaded
+		          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
+		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
 
 		i++;
 
@@ -295,11 +294,10 @@ int Main(int argc, char** argv)
 			ChangeList& downloadCL = changes.at(nextToEnqueue - i);
 			nextToEnqueue++;
 			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
-			{
+			    {
 				downloadCL.StartDownload(p4, git, branchSet, printBatch);
 				// Mark download as done.
-				downloaded++;
-			});
+				downloaded++; });
 		}
 	}
 
