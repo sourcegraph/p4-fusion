@@ -174,6 +174,8 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 			checkGit2Error(git_reference_delete(ref));
 		}
 	}
+	git_reference_iterator_free(refIter);
+	git_reference_free(ref);
 
 	PRINT("Creating new tags, if any...")
 
@@ -182,6 +184,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 
 	git_commit* commit;
 	checkGit2Error(git_commit_lookup(&commit, repo, git_reference_target(head)));
+	git_reference_free(head);
 
 	while (true)
 	{
@@ -193,6 +196,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 				SUCCESS("Creating tag " << sanitizeLabelName(v.label) << " for CL " << clID)
 				git_reference* tmpref;
 				checkGit2Error(git_reference_create(&tmpref, repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(commit), false, v.description.c_str()));
+				git_reference_free(tmpref);
 			}
 			delete revToLabel.at(clID);
 		}
@@ -202,6 +206,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 		}
 		checkGit2Error(git_commit_parent(&commit, commit, 0));
 	}
+	git_commit_free(commit);
 
 	return 0;
 }
