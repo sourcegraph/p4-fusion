@@ -164,6 +164,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 			revToLabel.at(cl)->erase(labelName);
 			if (revToLabel.at(cl)->empty())
 			{
+				delete revToLabel.at(cl);
 				revToLabel.erase(cl);
 			}
 		}
@@ -193,6 +194,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 				git_reference* tmpref;
 				checkGit2Error(git_reference_create(&tmpref, repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(commit), false, v.description.c_str()));
 			}
+			delete revToLabel.at(clID);
 		}
 		if (git_commit_parentcount(commit) == 0)
 		{
