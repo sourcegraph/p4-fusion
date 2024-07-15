@@ -10,6 +10,7 @@
 
 #include "git2.h"
 #include "minitrace.h"
+#include "labels_conversion.h"
 #include "utils/std_helpers.h"
 
 void checkGit2Error(int errcode)
@@ -166,11 +167,6 @@ void GitAPI::InitializeRepository(const bool noCreateBaseCommit)
 		// This empty oid will pass the git_oid_is_zero check.
 		m_FirstCommitOid = git_oid {};
 	}
-}
-
-git_repository* GitAPI::GetRepoPtr()
-{
-	return m_Repo;
 }
 
 bool GitAPI::IsHEADExists() const
@@ -416,6 +412,68 @@ std::string GitAPI::WriteChangelistBranch(
 
 	return commitSHA;
 }
+
+void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel)
+{
+	git_reference_iterator* refIter;
+	checkGit2Error(git_reference_iterator_glob_new(&refIter, m_Repo, "refs/tags/*"));
+	git_reference* ref;
+	while (git_reference_next(&ref, refIter) >= 0)
+	{
+		std::string labelName = trimPrefix(git_reference_name(ref), "refs/tags/");
+
+		git_commit* commit;
+		checkGit2Error(git_commit_lookup(&commit, m_Repo, git_reference_target(ref)));
+		if (std::string cl = getChangelistFromCommit(commit); revToLabel.contains(cl) && revToLabel.at(cl)->contains(labelName))
+		{
+			revToLabel.at(cl)->erase(labelName);
+			if (revToLabel.at(cl)->empty())
+			{
+				delete revToLabel.at(cl);
+				revToLabel.erase(cl);
+			}
+		}
+		else
+		{
+			PRINT("Tag has moved or no longer exists, deleting: " << labelName)
+			checkGit2Error(git_reference_delete(ref));
+		}
+		git_reference_free(ref);
+	}
+	git_reference_iterator_free(refIter);
+
+	PRINT("Creating new tags, if any...")
+
+	git_reference* head;
+	checkGit2Error(git_repository_head(&head, m_Repo));
+
+	git_commit* commit;
+	checkGit2Error(git_commit_lookup(&commit, m_Repo, git_reference_target(head)));
+	git_reference_free(head);
+
+	while (true)
+	{
+		std::string clID = getChangelistFromCommit(commit);
+		if (revToLabel.contains(clID))
+		{
+			for (auto& [_, v] : *revToLabel.at(clID))
+			{
+				SUCCESS("Creating tag " << sanitizeLabelName(v.label) << " for CL " << clID)
+				git_reference* tmpref;
+				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(commit), false, v.description.c_str()));
+				git_reference_free(tmpref);
+			}
+			delete revToLabel.at(clID);
+		}
+		if (git_commit_parentcount(commit) == 0)
+		{
+			break;
+		}
+		checkGit2Error(git_commit_parent(&commit, commit, 0));
+	}
+	git_commit_free(commit);
+}
+
 
 BlobWriter::BlobWriter(git_repository* gitRepo)
     : repo(gitRepo)

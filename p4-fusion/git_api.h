@@ -14,6 +14,7 @@
 #include "common.h"
 #include "commands/file_data.h"
 #include "commands/change_list.h"
+#include "commands/label_result.h"
 #include "git2/oid.h"
 
 struct git_repository;
@@ -70,8 +71,6 @@ public:
 	GitAPI() = delete;
 	~GitAPI();
 
-	git_repository* GetRepoPtr();
-
 	// WriteBlob returns a new BlobWriter instance that allows to write a single
 	// blob to the repository's ODB.
 	[[nodiscard]] BlobWriter WriteBlob() const;
@@ -92,4 +91,6 @@ public:
 	    const std::string& authorName,
 	    const std::string& authorEmail,
 	    const std::string& mergeFrom);
+
+	void CreateTagsFromLabels(std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel);
 };
