@@ -109,7 +109,7 @@ int updateTags(P4API* p4, const std::string& depotPath, git_repository* repo)
 
 	std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel;
 
-	for (auto& label : labelsRes.GetLabels())
+	for (auto& label : labels)
 	{
 		LabelResult labelRes = p4->Label(label);
 		if (labelRes.HasError())
