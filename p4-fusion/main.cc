@@ -20,7 +20,7 @@
 #include "branch_set.h"
 #include "tracer.h"
 #include "git2/commit.h"
-#include "labels_conversion.h"
+// #include "labels_conversion.h"
 
 #define P4_FUSION_VERSION "v1.13.2-sg"
 
@@ -164,53 +164,53 @@ int Main(int argc, char** argv)
 	const std::list<std::string>& labels = labelsRes.GetLabels();
 	SUCCESS("Received " << labels.size() << " labels from the Perforce server")
 
-	std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel;
-
-	for (auto& label : labels)
-	{
-		LabelResult labelRes = p4.Label(label);
-		if (labelRes.HasError())
-		{
-			ERR("Failed to retrieve label details: " << labelRes.PrintError());
-			continue;
-		}
-		if (!labelRes.revision.starts_with("@"))
-		{
-			continue;
-		}
-		labelRes.revision.erase(labelRes.revision.begin());
-		if (labelRes.views.empty())
-		{
-			if (!revToLabel.contains(labelRes.revision))
-			{
-				auto* newMap = new std::unordered_map<std::string, LabelResult>;
-				revToLabel.insert({ labelRes.revision, newMap });
-			}
-			auto res = revToLabel.at(labelRes.revision);
-			res->insert({ sanitizeLabelName(labelRes.label), labelRes });
-		}
-		else
-		{
-			for (auto& view : labelRes.views)
-			{
-				if (depotPath.starts_with(trimSuffix(view, "...")))
-				{
-					if (!revToLabel.contains(labelRes.revision))
-					{
-						auto* newMap = new std::unordered_map<std::string, LabelResult>;
-						revToLabel.insert({ labelRes.revision, newMap });
-					}
-					auto res = revToLabel.at(labelRes.revision);
-					res->insert({ sanitizeLabelName(labelRes.label), labelRes });
-				}
-			}
-		}
-	}
+	// std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel;
+	//
+	// for (auto& label : labels)
+	// {
+	// 	LabelResult labelRes = p4.Label(label);
+	// 	if (labelRes.HasError())
+	// 	{
+	// 		ERR("Failed to retrieve label details: " << labelRes.PrintError());
+	// 		continue;
+	// 	}
+	// 	if (!labelRes.revision.starts_with("@"))
+	// 	{
+	// 		continue;
+	// 	}
+	// 	labelRes.revision.erase(labelRes.revision.begin());
+	// 	if (labelRes.views.empty())
+	// 	{
+	// 		if (!revToLabel.contains(labelRes.revision))
+	// 		{
+	// 			auto* newMap = new std::unordered_map<std::string, LabelResult>;
+	// 			revToLabel.insert({ labelRes.revision, newMap });
+	// 		}
+	// 		auto res = revToLabel.at(labelRes.revision);
+	// 		res->insert({ sanitizeLabelName(labelRes.label), labelRes });
+	// 	}
+	// 	else
+	// 	{
+	// 		for (auto& view : labelRes.views)
+	// 		{
+	// 			if (depotPath.starts_with(trimSuffix(view, "...")))
+	// 			{
+	// 				if (!revToLabel.contains(labelRes.revision))
+	// 				{
+	// 					auto* newMap = new std::unordered_map<std::string, LabelResult>;
+	// 					revToLabel.insert({ labelRes.revision, newMap });
+	// 				}
+	// 				auto res = revToLabel.at(labelRes.revision);
+	// 				res->insert({ sanitizeLabelName(labelRes.label), labelRes });
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	// Return early if we have no work to do
 	if (changes.empty())
 	{
-		git.CreateTagsFromLabels(revToLabel);
+		// git.CreateTagsFromLabels(revToLabel);
 		SUCCESS("Repository is up to date. Updating tags.")
 		return 0;
 	}
@@ -358,7 +358,7 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
 
-	git.CreateTagsFromLabels(revToLabel);
+	// git.CreateTagsFromLabels(revToLabel);
 
 	return 0;
 }
