@@ -438,6 +438,7 @@ void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered
 			PRINT("Tag has moved or no longer exists, deleting: " << labelName)
 			checkGit2Error(git_reference_delete(ref));
 		}
+		git_commit_free(commit);
 		git_reference_free(ref);
 	}
 	git_reference_iterator_free(refIter);

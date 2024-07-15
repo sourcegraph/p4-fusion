@@ -210,7 +210,7 @@ int Main(int argc, char** argv)
 	// Return early if we have no work to do
 	if (changes.empty())
 	{
-		// git.CreateTagsFromLabels(revToLabel);
+		git.CreateTagsFromLabels(revToLabel);
 		SUCCESS("Repository is up to date. Updating tags.")
 		return 0;
 	}
@@ -358,7 +358,7 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
 
-	// git.CreateTagsFromLabels(revToLabel);
+	git.CreateTagsFromLabels(revToLabel);
 
 	return 0;
 }
