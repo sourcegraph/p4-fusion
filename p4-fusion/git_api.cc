@@ -448,31 +448,35 @@ void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered
 	git_reference* head;
 	checkGit2Error(git_repository_head(&head, m_Repo));
 
-	git_commit* commit;
-	checkGit2Error(git_commit_lookup(&commit, m_Repo, git_reference_target(head)));
+	git_commit* current_commit;
+	checkGit2Error(git_commit_lookup(&current_commit, m_Repo, git_reference_target(head)));
 	git_reference_free(head);
+
+	git_commit* parent_commit;
 
 	while (true)
 	{
-		std::string clID = getChangelistFromCommit(commit);
+		std::string clID = getChangelistFromCommit(current_commit);
 		if (revToLabel.contains(clID))
 		{
 			for (auto& [_, v] : *revToLabel.at(clID))
 			{
 				SUCCESS("Creating tag " << sanitizeLabelName(v.label) << " for CL " << clID)
 				git_reference* tmpref;
-				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(commit), false, v.description.c_str()));
+				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(current_commit), false, v.description.c_str()));
 				git_reference_free(tmpref);
 			}
 			delete revToLabel.at(clID);
 		}
-		if (git_commit_parentcount(commit) == 0)
+		if (git_commit_parentcount(current_commit) == 0)
 		{
+			git_commit_free(current_commit);
 			break;
 		}
-		checkGit2Error(git_commit_parent(&commit, commit, 0));
+		checkGit2Error(git_commit_parent(&parent_commit, current_commit, 0));
+		git_commit_free(current_commit);
+		current_commit = parent_commit;
 	}
-	git_commit_free(commit);
 }
 
 
