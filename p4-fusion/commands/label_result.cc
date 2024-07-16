@@ -9,19 +9,27 @@
 void LabelResult::OutputStat(StrDict* varList)
 {
 	StrPtr* labelPtr = varList->GetVar("Label");
-	StrPtr* revisionPtr = varList->GetVar("Revision");
-	StrPtr* descriptionPtr = varList->GetVar("Description");
 
-	if (!labelPtr || !revisionPtr)
+	if (!labelPtr)
 	{
 		// TODO: We don't actually throw here.
-		ERR("Label or Revision field not found for a Perforce label")
+		ERR("Label field not found for a Perforce label")
 		return;
 	}
 
+	StrPtr* revisionPtr = varList->GetVar("Revision");
+	StrPtr* descriptionPtr = varList->GetVar("Description");
+
 	label = labelPtr->Text();
-	revision = revisionPtr->Text();
-	description = descriptionPtr->Text();
+
+	if (revisionPtr)
+	{
+		revision = revisionPtr->Text();
+	}
+	if (descriptionPtr)
+	{
+		description = descriptionPtr->Text();
+	}
 
 	int i = 0;
 	StrPtr* view;

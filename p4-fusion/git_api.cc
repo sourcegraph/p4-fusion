@@ -413,7 +413,7 @@ std::string GitAPI::WriteChangelistBranch(
 	return commitSHA;
 }
 
-void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered_map<std::string, LabelResult>*> revToLabel)
+void GitAPI::CreateTagsFromLabels(LabelMap revToLabel)
 {
 	git_reference_iterator* refIter;
 	checkGit2Error(git_reference_iterator_glob_new(&refIter, m_Repo, "refs/tags/*"));
