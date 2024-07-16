@@ -10,7 +10,7 @@
 // https://git-scm.com/docs/git-check-ref-format
 //
 // All invalid characters are replaced with underscores.
-// 
+//
 // This function was LLM generated and the regex checked with
 // https://regex101.com/ . Seems to make sense, and tested
 // with a few label names.
