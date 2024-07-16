@@ -1,52 +1,81 @@
 #include <string>
+#include <regex>
 
 #include "p4_api.h"
 #include "git2/commit.h"
 #include "git2/types.h"
 
-std::string sanitizeLabelName(std::string label)
+// sanitizeLabelName removes characters from a label name that
+// aren't valid in git tags as specified by
+// https://git-scm.com/docs/git-check-ref-format
+//
+// All invalid characters are replaced with underscores.
+// 
+// This function was LLM generated and the regex checked with
+// https://regex101.com/ . Seems to make sense, and tested
+// with a few label names.
+std::string convertLabelToTag(std::string input)
 {
-	// Remove leading slashes
-	while (!label.empty() && label.front() == '/')
+	std::string result = input;
+
+	// Rule: Replace invalid characters with underscores
+	std::regex invalidChars(R"([[:cntrl:]\x7f ~^:?\*\[\]\\])");
+	result = std::regex_replace(result, invalidChars, "_");
+
+	// Rule: Remove sequences "@{"
+	std::regex atBrace(R"(@\{)");
+	result = std::regex_replace(result, atBrace, "_");
+
+	// Rule: No consecutive dots
+	std::regex consecutiveDots(R"(\.\.)");
+	while (std::regex_search(result, consecutiveDots))
 	{
-		label.erase(label.begin());
+		result = std::regex_replace(result, consecutiveDots, "_");
 	}
 
-	// Remove trailing slashes and dots
-	while (!label.empty() && (label.back() == '/' || label.back() == '.'))
+	// Rule: No slash-separated component can begin with a dot
+	std::regex dotComponent(R"(/\.|^\.|(\.\.))");
+	if (std::regex_search(result, dotComponent))
 	{
-		label.pop_back();
+		result = std::regex_replace(result, dotComponent, "_");
 	}
 
-	// Replace specific characters with underscores
-	const std::string charsToReplace = " ~^:?*[@{";
-	for (char& ch : label)
+	// Rule: No component can end with ".lock"
+	std::regex dotLock(R"(\.lock(?=/|$))");
+	result = std::regex_replace(result, dotLock, "_lock");
+
+	// Rule: Cannot end with a dot
+	if (result.back() == '.')
 	{
-		if (charsToReplace.find(ch) != std::string::npos)
-		{
-			ch = '_';
-		}
+		result.back() = '_';
 	}
 
-	// Replace "//" with "/"
-	const std::string doubleSlash = "//";
-	const std::string singleSlash = "/";
-	std::string::size_type pos = 0;
-	while ((pos = label.find(doubleSlash, pos)) != std::string::npos)
+	// Rule: Cannot end with a slash
+	if (result.back() == '/')
 	{
-		label.replace(pos, doubleSlash.length(), singleSlash);
+		result.back() = '_';
 	}
 
-	// If the label is exactly "@", return an empty string
-	if (label == "@")
+	// Rule: Cannot begin with a slash
+	if (result.front() == '/')
 	{
-		return "";
+		result.front() = '_';
 	}
 
-	return label;
+	// Rule: Cannot have multiple consecutive slashes
+	std::regex consecutiveSlashes(R"(//+)");
+	result = std::regex_replace(result, consecutiveSlashes, "/");
+
+	// Rule: Cannot be the single character '@'
+	if (result == "@")
+	{
+		result = "_";
+	}
+
+	return result;
 }
 
-// Function to trim the specified suffix from the string
+// Trim the specified suffix from the string
 std::string trimSuffix(const std::string& str, const std::string& suffix)
 {
 	if (str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0)
@@ -56,7 +85,7 @@ std::string trimSuffix(const std::string& str, const std::string& suffix)
 	return str;
 }
 
-// Function to trim the specified prefix from the string
+// Trim the specified prefix from the string
 std::string trimPrefix(const std::string& str, const std::string& prefix)
 {
 	if (str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0)
@@ -72,7 +101,7 @@ std::string getChangelistFromCommit(const git_commit* commit)
 	// Note that extra branching information can be added after it.
 	// ": change = " is 11 characters long.
 	std::string message = git_commit_message(commit);
-	const size_t pos = message.find(": change = ");
+	const size_t pos = message.rfind(": change = ");
 	if (pos == std::string::npos)
 	{
 		throw std::invalid_argument("failed to parse commit message, well known section : change =  not found");

@@ -187,7 +187,7 @@ int Main(int argc, char** argv)
 				revToLabel.insert({ labelRes.revision, newMap });
 			}
 			auto res = revToLabel.at(labelRes.revision);
-			res->insert({ sanitizeLabelName(labelRes.label), labelRes });
+			res->insert({ convertLabelToTag(labelRes.label), labelRes });
 		}
 		else
 		{
@@ -201,7 +201,7 @@ int Main(int argc, char** argv)
 						revToLabel.insert({ labelRes.revision, newMap });
 					}
 					auto res = revToLabel.at(labelRes.revision);
-					res->insert({ sanitizeLabelName(labelRes.label), labelRes });
+					res->insert({ convertLabelToTag(labelRes.label), labelRes });
 				}
 			}
 		}

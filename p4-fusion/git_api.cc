@@ -461,9 +461,9 @@ void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered
 		{
 			for (auto& [_, v] : *revToLabel.at(clID))
 			{
-				SUCCESS("Creating tag " << sanitizeLabelName(v.label) << " for CL " << clID)
+				SUCCESS("Creating tag " << convertLabelToTag(v.label) << " for CL " << clID)
 				git_reference* tmpref;
-				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + sanitizeLabelName(v.label)).c_str(), git_commit_id(current_commit), false, v.description.c_str()));
+				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + convertLabelToTag(v.label)).c_str(), git_commit_id(current_commit), false, v.description.c_str()));
 				git_reference_free(tmpref);
 			}
 			delete revToLabel.at(clID);

@@ -242,6 +242,8 @@ UsersResult P4API::Users()
 
 LabelsResult P4API::Labels()
 {
+	MTR_SCOPE("P4", __func__);
+
 	return Run<LabelsResult>("labels", { "-a" }, []() -> LabelsResult
 	    { return {}; });
 }
