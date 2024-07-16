@@ -479,7 +479,6 @@ void GitAPI::CreateTagsFromLabels(std::unordered_map<std::string, std::unordered
 	}
 }
 
-
 BlobWriter::BlobWriter(git_repository* gitRepo)
     : repo(gitRepo)
     , writer(nullptr)
