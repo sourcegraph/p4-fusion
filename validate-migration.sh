@@ -258,7 +258,7 @@ fi
 grep -E '] TAG:' "${workdir}/migration-log.txt" \
   | cut -f 2- -d ']' \
   | cut -f 2- -d ':' \
-  > "${workdir}/history.txt"
+  > "${workdir}/history.txt" || true # Might not be any tags so we ignore if this errors
 
 # Process every commit.
 while read line ; do
