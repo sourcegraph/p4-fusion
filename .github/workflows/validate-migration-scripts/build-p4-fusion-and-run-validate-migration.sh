@@ -90,6 +90,7 @@ echo "::group::{Run p4-fusion against the downloaded depot}"
     --includeBinaries true
     --fsyncEnable true
     --noColor true
+    --convertLabels true
   )
 
   if [[ "${USE_VALGRIND:-"false"}" == "true" ]]; then
