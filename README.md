@@ -74,6 +74,9 @@ These execution times are expected to scale as expected with larger depots (mill
 --retries [Optional, Default is 10]
         Specify how many times a command should be retried before the process exits in a failure.
 
+--convertLabels [Optional, Default is false]
+        Whether or not to convert labels to tags.
+
 --src [Required]
         Relative path where the git repository should be created. This path should be empty before running p4-fusion for the first time in a directory.
 
@@ -152,7 +155,8 @@ E.g. You can build tests and at the same time enable profiling by running `./gen
         --printBatch 100 \
         --lookAhead 2000 \
         --retries 10 \
-        --refresh 100
+        --refresh 100 \
+        --convertLabels true
 ```
 
 There should be a Git repo being created in the `clones/.git` directory with commits being created as the tool runs.
