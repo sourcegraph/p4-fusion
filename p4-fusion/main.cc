@@ -171,7 +171,7 @@ int Main(int argc, char** argv)
 	{
 		SUCCESS("Repository is up to date.")
 
-		if (arguments.GetConvertLabels())
+		if (!arguments.GetNoConvertLabels())
 		{
 			SUCCESS("Updating tags.")
 			git.CreateTagsFromLabels(revToLabel);
@@ -323,7 +323,7 @@ int Main(int argc, char** argv)
 
 	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
 
-	if (arguments.GetConvertLabels())
+	if (!arguments.GetNoConvertLabels())
 	{
 		SUCCESS("Updating tags.")
 		git.CreateTagsFromLabels(revToLabel);

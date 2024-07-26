@@ -57,6 +57,6 @@ public:
 	[[nodiscard]] bool GetNoColor() const { return GetParameterBool("--noColor"); };
 	[[nodiscard]] bool GetNoMerge() const { return GetParameterBool("--noMerge"); };
 	[[nodiscard]] bool GetNoBaseCommit() const { return GetParameterBool("--noBaseCommit"); };
-	[[nodiscard]] bool GetConvertLabels() const { return GetParameterBool("--convertLabels"); };
+	[[nodiscard]] bool GetNoConvertLabels() const { return GetParameterBool("--noConvertLabels"); };
 	[[nodiscard]] std::vector<std::string> GetBranches() const { return GetParameterList("--branch"); };
 };
