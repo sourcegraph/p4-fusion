@@ -73,6 +73,7 @@ export HOME=./verify/p4home
     --maxChanges -1 \
     --includeBinaries true \
     --fsyncEnable true \
+    --convertLabels true \
     --noColor true 2>&1 | tee ./verify/p4fusion.log
 
 export P4CLIENT=<PROVIDE_ME>

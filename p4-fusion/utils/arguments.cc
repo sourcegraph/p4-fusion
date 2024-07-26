@@ -29,6 +29,7 @@ Arguments::Arguments(int argc, char** argv)
 	OptionalParameter("--includeBinaries", "false", "Do not discard binary files while downloading changelists.");
 	OptionalParameter("--flushRate", "30", "Interval in seconds at which the profiling data is flushed to the disk.");
 	OptionalParameter("--noColor", "false", "Disable colored output.");
+	OptionalParameter("--convertLabels", "false", "Whether or not to convert labels to tags.");
 
 	for (int i = 1; i < argc - 1; i += 2)
 	{
