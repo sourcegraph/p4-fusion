@@ -331,7 +331,8 @@ int Main(int argc, char** argv)
 
 	if (!arguments.GetNoConvertLabels())
 	{
-		return fetchAndUpdateLabels(p4, git, depotPath);
+		P4API p4labelsClient;
+		return fetchAndUpdateLabels(p4labelsClient, git, depotPath);
 	}
 
 	return 0;
