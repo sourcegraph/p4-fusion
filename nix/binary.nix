@@ -1,5 +1,4 @@
-{ callPackage
-, cmake
+{ cmake
 , darwin
 , helix-core-api-set
 , hostPlatform
@@ -15,14 +14,13 @@
 , zlib
 }:
 let
-  inherit (callPackage ./util.nix { }) unNixifyDylibs;
   # at the time of writing, there is an SDK version issue when building on
   # x86_64-darwin, so we force it to 11.0.
   # in future nixpkgs version, SDK versions should be better and more
   #  consistently configured.
   stdenv' = (if stdenv.isDarwin then overrideSDK stdenv "11.0" else stdenv);
 in
-unNixifyDylibs (stdenv'.mkDerivation rec {
+stdenv'.mkDerivation rec {
   name = "p4-fusion";
   version = "v1.13.2-sg";
 
@@ -94,4 +92,4 @@ unNixifyDylibs (stdenv'.mkDerivation rec {
     platforms = [ "x86_64-darwin" "aarch64-darwin" "x86_64-linux" ];
     license = lib.licenses.bsd3;
   };
-})
+}

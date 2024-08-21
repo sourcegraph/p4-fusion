@@ -25,20 +25,11 @@
     assert lib.assertMsg (drv ? "overrideAttrs") "unNixifyDylibs expects an overridable derivation";
 
     drv.overrideAttrs (oldAttrs: lib.optionalAttrs pkgs.hostPlatform.isMacOS {
-      nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++
-        map (drv: drv.__spliced.buildHost or drv)
-          (with (pkgs.__splicedPackages or pkgs); [
-            findutils
-            darwin.cctools
-            coreutils
-            gnugrep
-          ]);
-
-      postFixup = (oldAttrs.postFixup or "") + ''
-        for bin in $(find $out/bin -type f); do
-          for lib in $(otool -L $bin | tail -n +2 | cut -d' ' -f1 | grep nix); do
+      preFixup = (oldAttrs.postFixup or "") + ''
+        for bin in $(${pkgs.findutils}/bin/find $out/bin -type f); do
+          for lib in $(${pkgs.darwin.cctools}/bin/otool -L $bin | ${pkgs.coreutils}/bin/tail -n +2 | ${pkgs.coreutils}/bin/cut -d' ' -f1 | ${pkgs.gnugrep}/bin/grep nix); do
             echo "patching dylib from "$lib" to "@rpath/$(basename $lib)""
-            install_name_tool -change "$lib" "@rpath/$(basename $lib)" $bin
+            ${pkgs.darwin.cctools}/bin/install_name_tool -change "$lib" "@rpath/$(basename $lib)" $bin
           done
         done
       '';
