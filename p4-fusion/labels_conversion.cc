@@ -142,9 +142,7 @@ LabelNameToDetails getLabelsDetails2(P4API* p4, std::list<LabelsResult::LabelDat
 	return labelMap;
 }
 
-// Fetches additional label details for each label using the provided p4 client
-// and returns a map of revision to label to label details.
-LabelMap getLabelsDetails(P4API* p4, std::string depotPath, LabelNameToDetails labels)
+LabelMap labelDetailsToMap(std::string depotPath, LabelNameToDetails labels)
 {
 	LabelMap revToLabel;
 
