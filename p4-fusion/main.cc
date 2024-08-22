@@ -58,8 +58,11 @@ int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, c
 		compResp.resultingLabels.insert({ pair.first, pair.second });
 	}
 
-	PRINT("Caching updated labels to " << cachePath)
-	writeLabelMapToDisk(cachePath, compResp.resultingLabels, cachePath);
+	if (cachePath.size() > 0)
+	{
+		PRINT("Caching updated labels to " << cachePath)
+		writeLabelMapToDisk(cachePath, compResp.resultingLabels, cachePath);
+	}
 
 	LabelMap revToLabel = labelDetailsToMap(depotPath, compResp.resultingLabels);
 
