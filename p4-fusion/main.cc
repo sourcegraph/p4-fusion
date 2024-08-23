@@ -21,10 +21,6 @@
 
 #define P4_FUSION_VERSION "v1.14.1-sg"
 
-// We need to figure out which labels to delete as well?
-// Okay, split it into two functions. Don't be stupid.
-// Or make a struct, babyyyyyy
-
 int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, const std::string& cachePath)
 {
 	// Load labels
