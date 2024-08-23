@@ -50,7 +50,7 @@ int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, c
 	compareResponse compResp = compareLabelsToCache(labels, cachedLabels);
 
 	PRINT("Fetching " << compResp.labelsToFetch.size() << " new label details")
-	LabelNameToDetails fetchedLabelMap = getLabelsDetails2(&p4, compResp.labelsToFetch);
+	LabelNameToDetails fetchedLabelMap = getLabelsDetails(&p4, compResp.labelsToFetch);
 
 	// Join the new map with the old map
 	for (const auto& pair : fetchedLabelMap)

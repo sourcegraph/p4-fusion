@@ -6,6 +6,8 @@
 #include "git2/commit.h"
 #include "git2/types.h"
 
+#include "labels_conversion.h"
+
 // sanitizeLabelName removes characters from a label name that
 // aren't valid in git tags as specified by
 // https://git-scm.com/docs/git-check-ref-format
@@ -120,7 +122,9 @@ std::string getChangelistFromCommit(const git_commit* commit)
 	return cl;
 }
 
-LabelNameToDetails getLabelsDetails2(P4API* p4, std::list<LabelsResult::LabelData> labels)
+// Fetch the details of a list of labels. This will make requests
+// to the Perforce server equal to the number of labels in the list
+LabelNameToDetails getLabelsDetails(P4API* p4, std::list<LabelsResult::LabelData> labels)
 {
 	LabelNameToDetails labelMap;
 
