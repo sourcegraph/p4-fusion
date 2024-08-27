@@ -1,32 +1,32 @@
 #include "labels_cache.h"
 
-void writeString(std::ofstream& outFile, const std::string& str)
+void write_string(std::ofstream& outFile, const std::string& str)
 {
 	size_t length = str.size();
 	outFile.write(reinterpret_cast<const char*>(&length), sizeof(length));
 	outFile.write(str.data(), length);
 }
 
-void writeVectorOfStrings(std::ofstream& outFile, const std::vector<std::string>& vec)
+void write_vector_of_strings(std::ofstream& outFile, const std::vector<std::string>& vec)
 {
 	size_t vecSize = vec.size();
 	outFile.write(reinterpret_cast<const char*>(&vecSize), sizeof(vecSize));
 	for (const auto& str : vec)
 	{
-		writeString(outFile, str);
+		write_string(outFile, str);
 	}
 }
 
-void writeStructToDisk(std::ofstream& outFile, const LabelResult& labels)
+void write_struct_to_disk(std::ofstream& outFile, const LabelResult& labels)
 {
-	writeString(outFile, labels.label);
-	writeString(outFile, labels.revision);
-	writeString(outFile, labels.description);
-	writeString(outFile, labels.update);
-	writeVectorOfStrings(outFile, labels.views);
+	write_string(outFile, labels.label);
+	write_string(outFile, labels.revision);
+	write_string(outFile, labels.description);
+	write_string(outFile, labels.update);
+	write_vector_of_strings(outFile, labels.views);
 }
 
-void writeLabelMapToDisk(const std::string& filename, const LabelNameToDetails& labelMap, const std::string& cacheFile)
+void write_label_map_to_disk(const std::string& filename, const LabelNameToDetails& labelMap, const std::string& cacheFile)
 {
 	std::ofstream outFile(filename, std::ios::binary);
 	if (!outFile)
@@ -42,13 +42,13 @@ void writeLabelMapToDisk(const std::string& filename, const LabelNameToDetails& 
 	// Write each key-value pair
 	for (const auto& pair : labelMap)
 	{
-		writeStructToDisk(outFile, pair.second);
+		write_struct_to_disk(outFile, pair.second);
 	}
 
 	outFile.close();
 }
 
-std::string readString(std::ifstream& inFile)
+std::string read_string(std::ifstream& inFile)
 {
 	size_t length;
 	inFile.read(reinterpret_cast<char*>(&length), sizeof(length));
@@ -57,30 +57,30 @@ std::string readString(std::ifstream& inFile)
 	return str;
 }
 
-std::vector<std::string> readVectorOfStrings(std::ifstream& inFile)
+std::vector<std::string> read_vector_of_strings(std::ifstream& inFile)
 {
 	size_t vecSize;
 	inFile.read(reinterpret_cast<char*>(&vecSize), sizeof(vecSize));
 	std::vector<std::string> vec(vecSize);
 	for (size_t i = 0; i < vecSize; ++i)
 	{
-		vec[i] = readString(inFile);
+		vec[i] = read_string(inFile);
 	}
 	return vec;
 }
 
-LabelResult readStructFromDisk(std::ifstream& inFile)
+LabelResult read_struct_from_disk(std::ifstream& inFile)
 {
 	LabelResult label;
-	label.label = readString(inFile);
-	label.revision = readString(inFile);
-	label.description = readString(inFile);
-	label.update = readString(inFile);
-	label.views = readVectorOfStrings(inFile);
+	label.label = read_string(inFile);
+	label.revision = read_string(inFile);
+	label.description = read_string(inFile);
+	label.update = read_string(inFile);
+	label.views = read_vector_of_strings(inFile);
 	return label;
 }
 
-LabelNameToDetails readLabelMapFromDisk(const std::string& filename)
+LabelNameToDetails read_label_map_from_disk(const std::string& filename)
 {
 	LabelNameToDetails labelMap;
 	std::ifstream inFile(filename, std::ios::binary);
@@ -97,7 +97,7 @@ LabelNameToDetails readLabelMapFromDisk(const std::string& filename)
 	// Read each key-value pair and insert into the map
 	for (size_t i = 0; i < size; ++i)
 	{
-		LabelResult value = readStructFromDisk(inFile);
+		LabelResult value = read_struct_from_disk(inFile);
 		labelMap.insert({ value.label, value });
 	}
 
@@ -108,16 +108,16 @@ LabelNameToDetails readLabelMapFromDisk(const std::string& filename)
 // Compares the last updated date in the labels list to the updated dates
 // in the cache, and returns all labels of which the last updated date is
 // different.
-CompareResponse compareLabelsToCache(const std::list<LabelsResult::LabelData>& labels, LabelNameToDetails& labelMap)
+CompareResponse compare_labels_to_cache(const std::list<LabelsResult::LabelData>& labels, LabelNameToDetails& cachedLabelMap)
 {
 	LabelNameToDetails newLabelMap;
 	std::list<LabelsResult::LabelData> labelsToFetch;
 	for (const auto& label : labels)
 	{
-		if (labelMap.contains(label.label))
+		if (cachedLabelMap.contains(label.label))
 		{
 			LabelResult cachedLabel
-			    = labelMap.at(label.label);
+			    = cachedLabelMap.at(label.label);
 			if (cachedLabel.update != label.update)
 			{
 				labelsToFetch.push_back(label);
