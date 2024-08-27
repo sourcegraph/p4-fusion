@@ -30,6 +30,8 @@
           # but apply them to every system type as it doesn't harm them anyway.
           # note also a http-parser workaround detailed in the below file.
           static-deps-set = pkgsStatic.callPackage ./nix/static-deps.nix { };
+          
+          inherit (pkgs.callPackage ./nix/util.nix { }) unNixifyDylibs;
         in
         {
           p4-fusion_openssl3 = pkgs.callPackage ./nix/binary.nix {
@@ -41,16 +43,18 @@
             helix-core-api-set = helix-core-api-set."1.1";
           };
 
-          p4-fusion_openssl3-static = pkgsStatic.callPackage ./nix/binary.nix {
+          p4-fusion_openssl3-static = unNixifyDylibs (pkgsStatic.callPackage ./nix/binary.nix {
+            darwin = pkgs.darwin or null;
             inherit (static-deps-set) http-parser libiconv openssl pcre zlib;
             helix-core-api-set = helix-core-api-set."3.0";
-          };
+          });
 
-          p4-fusion_openssl1_1-static = pkgsStatic.callPackage ./nix/binary.nix {
+          p4-fusion_openssl1_1-static = unNixifyDylibs (pkgsStatic.callPackage ./nix/binary.nix {
             openssl = static-deps-set.openssl_1_1;
+            darwin = pkgs.darwin or null;
             inherit (static-deps-set) http-parser libiconv pcre zlib;
             helix-core-api-set = helix-core-api-set."1.1";
-          };
+          });
         });
 
       apps = forAllSystems (pkgs:
