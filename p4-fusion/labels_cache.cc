@@ -1,5 +1,12 @@
 #include "labels_cache.h"
 
+const int LABEL_CACHE_VERSION = 1;
+
+void write_int(std::ofstream& outFile, const int number)
+{
+	outFile.write(reinterpret_cast<const char*>(&number), sizeof(number));
+}
+
 void write_string(std::ofstream& outFile, const std::string& str)
 {
 	size_t length = str.size();
@@ -19,6 +26,7 @@ void write_vector_of_strings(std::ofstream& outFile, const std::vector<std::stri
 
 void write_struct_to_disk(std::ofstream& outFile, const LabelResult& labels)
 {
+	write_int(outFile, LABEL_CACHE_VERSION); // Write a version number first
 	write_string(outFile, labels.label);
 	write_string(outFile, labels.revision);
 	write_string(outFile, labels.description);
@@ -48,6 +56,13 @@ void write_label_map_to_disk(const std::string& filename, const LabelNameToDetai
 	outFile.close();
 }
 
+int read_int(std::ifstream& inFile)
+{
+	int number;
+	inFile.read(reinterpret_cast<char*>(&number), sizeof(number));
+	return number;
+}
+
 std::string read_string(std::ifstream& inFile)
 {
 	size_t length;
@@ -72,6 +87,12 @@ std::vector<std::string> read_vector_of_strings(std::ifstream& inFile)
 LabelResult read_struct_from_disk(std::ifstream& inFile)
 {
 	LabelResult label;
+	int version = read_int(inFile);
+	if (version != LABEL_CACHE_VERSION)
+	{
+		ERR("Incorrect label version!")
+		return label;
+	}
 	label.label = read_string(inFile);
 	label.revision = read_string(inFile);
 	label.description = read_string(inFile);
