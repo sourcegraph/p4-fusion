@@ -108,7 +108,7 @@ LabelNameToDetails readLabelMapFromDisk(const std::string& filename)
 // Compares the last updated date in the labels list to the updated dates
 // in the cache, and returns all labels of which the last updated date is
 // different.
-compareResponse compareLabelsToCache(const std::list<LabelsResult::LabelData>& labels, LabelNameToDetails& labelMap)
+CompareResponse compareLabelsToCache(const std::list<LabelsResult::LabelData>& labels, LabelNameToDetails& labelMap)
 {
 	LabelNameToDetails newLabelMap;
 	std::list<LabelsResult::LabelData> labelsToFetch;
@@ -133,7 +133,7 @@ compareResponse compareLabelsToCache(const std::list<LabelsResult::LabelData>& l
 		}
 	}
 
-	return compareResponse {
+	return CompareResponse {
 		.labelsToFetch = labelsToFetch,
 		.resultingLabels = newLabelMap
 	};
