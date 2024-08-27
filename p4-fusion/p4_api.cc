@@ -244,6 +244,8 @@ LabelsResult P4API::Labels()
 {
 	MTR_SCOPE("P4", __func__);
 
+	// -a - return all labels
+	// -t - add last updated at timestamp to labels
 	return Run<LabelsResult>("labels", { "-a", "-t" }, []() -> LabelsResult
 	    { return {}; });
 }

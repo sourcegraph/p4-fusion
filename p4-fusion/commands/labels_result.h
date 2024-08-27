@@ -15,7 +15,7 @@ public:
 	struct LabelData
 	{
 		std::string label;
-		std::string update;
+		std::string update; // Last updated at timestamp in unix time
 	};
 
 private:
