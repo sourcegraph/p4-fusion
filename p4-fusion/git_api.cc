@@ -420,11 +420,11 @@ void GitAPI::CreateTagsFromLabels(LabelMap revToLabel)
 	git_reference* ref;
 	while (git_reference_next(&ref, refIter) >= 0)
 	{
-		std::string labelName = trimPrefix(git_reference_name(ref), "refs/tags/");
+		std::string labelName = trim_prefix(git_reference_name(ref), "refs/tags/");
 
 		git_commit* commit;
 		checkGit2Error(git_commit_lookup(&commit, m_Repo, git_reference_target(ref)));
-		if (std::string cl = getChangelistFromCommit(commit); revToLabel.contains(cl) && revToLabel.at(cl)->contains(labelName))
+		if (std::string cl = get_changelist_from_commit(commit); revToLabel.contains(cl) && revToLabel.at(cl)->contains(labelName))
 		{
 			revToLabel.at(cl)->erase(labelName);
 			if (revToLabel.at(cl)->empty())
@@ -456,15 +456,15 @@ void GitAPI::CreateTagsFromLabels(LabelMap revToLabel)
 
 	while (true)
 	{
-		std::string clID = getChangelistFromCommit(current_commit);
+		std::string clID = get_changelist_from_commit(current_commit);
 		if (revToLabel.contains(clID))
 		{
 			for (auto& [_, v] : *revToLabel.at(clID))
 			{
 
-				PRINT("TAG:" << convertLabelToTag(v.label) << ":" << v.label)
+				PRINT("TAG:" << convert_label_to_tag(v.label) << ":" << v.label)
 				git_reference* tmpref;
-				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + convertLabelToTag(v.label)).c_str(), git_commit_id(current_commit), false, v.description.c_str()));
+				checkGit2Error(git_reference_create(&tmpref, m_Repo, ("refs/tags/" + convert_label_to_tag(v.label)).c_str(), git_commit_id(current_commit), false, v.description.c_str()));
 				git_reference_free(tmpref);
 			}
 			delete revToLabel.at(clID);

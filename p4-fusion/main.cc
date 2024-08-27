@@ -38,15 +38,15 @@ int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, c
 	if (cachePath.size() > 0)
 	{
 		PRINT("Reading labels from cache")
-		cachedLabels = readLabelMapFromDisk(cachePath);
+		cachedLabels = read_label_map_from_disk(cachePath);
 		SUCCESS("Successfully read " << cachedLabels.size() << " cached labels")
 	}
 
 	PRINT("Comparing cached labels with labels from the Perforce server")
-	compareResponse compResp = compareLabelsToCache(labels, cachedLabels);
+	CompareResponse compResp = compare_labels_to_cache(labels, cachedLabels);
 
 	PRINT("Fetching " << compResp.labelsToFetch.size() << " new label details")
-	LabelNameToDetails fetchedLabelMap = getLabelsDetails(&p4, compResp.labelsToFetch);
+	LabelNameToDetails fetchedLabelMap = get_labels_details(&p4, compResp.labelsToFetch);
 
 	// Join the new map with the old map
 	for (const auto& pair : fetchedLabelMap)
@@ -57,10 +57,10 @@ int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, c
 	if (cachePath.size() > 0)
 	{
 		PRINT("Caching updated labels to " << cachePath)
-		writeLabelMapToDisk(cachePath, compResp.resultingLabels, cachePath);
+		write_label_map_to_disk(cachePath, compResp.resultingLabels, cachePath);
 	}
 
-	LabelMap revToLabel = labelDetailsToMap(depotPath, compResp.resultingLabels);
+	LabelMap revToLabel = label_details_to_map(depotPath, compResp.resultingLabels);
 
 	PRINT("Updating tags.")
 	git.CreateTagsFromLabels(revToLabel);

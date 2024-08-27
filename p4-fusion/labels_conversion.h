@@ -6,10 +6,10 @@
 // A map from a label name to the details of the label
 using LabelNameToDetails = std::unordered_map<std::string, LabelResult>;
 
-std::string convertLabelToTag(std::string label);
-std::string trimPrefix(const std::string& str, const std::string& prefix);
-std::string getChangelistFromCommit(const git_commit* commit);
-LabelMap labelDetailsToMap(std::string depotPath, LabelNameToDetails labels);
-LabelNameToDetails getLabelsDetails(P4API* p4, std::list<LabelsResult::LabelData> labels);
+std::string convert_label_to_tag(std::string label);
+std::string trim_prefix(const std::string& str, const std::string& prefix);
+std::string get_changelist_from_commit(const git_commit* commit);
+LabelMap label_details_to_map(std::string depotPath, LabelNameToDetails labels);
+LabelNameToDetails get_labels_details(P4API* p4, std::list<LabelsResult::LabelData> labels);
 
 #endif // LABELS_CONVERSION_H

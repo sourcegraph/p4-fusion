@@ -17,7 +17,7 @@
 // This function was LLM generated and the regex checked with
 // https://regex101.com/ . Seems to make sense, and tested
 // with a few label names.
-std::string convertLabelToTag(std::string input)
+std::string convert_label_to_tag(std::string input)
 {
 	std::string result = input;
 
@@ -89,7 +89,7 @@ std::string trimSuffix(const std::string& str, const std::string& suffix)
 }
 
 // Trim the specified prefix from the string
-std::string trimPrefix(const std::string& str, const std::string& prefix)
+std::string trim_prefix(const std::string& str, const std::string& prefix)
 {
 	if (str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0)
 	{
@@ -98,7 +98,7 @@ std::string trimPrefix(const std::string& str, const std::string& prefix)
 	return str;
 }
 
-std::string getChangelistFromCommit(const git_commit* commit)
+std::string get_changelist_from_commit(const git_commit* commit)
 {
 	// Look for the specific change message generated from the Commit method.
 	// Note that extra branching information can be added after it.
@@ -124,7 +124,7 @@ std::string getChangelistFromCommit(const git_commit* commit)
 
 // Fetch the details of a list of labels. This will make requests
 // to the Perforce server equal to the number of labels in the list
-LabelNameToDetails getLabelsDetails(P4API* p4, std::list<LabelsResult::LabelData> labels)
+LabelNameToDetails get_labels_details(P4API* p4, std::list<LabelsResult::LabelData> labels)
 {
 	LabelNameToDetails labelMap;
 
@@ -146,7 +146,7 @@ LabelNameToDetails getLabelsDetails(P4API* p4, std::list<LabelsResult::LabelData
 	return labelMap;
 }
 
-LabelMap labelDetailsToMap(std::string depotPath, LabelNameToDetails labels)
+LabelMap label_details_to_map(std::string depotPath, LabelNameToDetails labels)
 {
 	LabelMap revToLabel;
 
@@ -166,7 +166,7 @@ LabelMap labelDetailsToMap(std::string depotPath, LabelNameToDetails labels)
 				revToLabel.insert({ labelRes.revision, newMap });
 			}
 			auto res = revToLabel.at(labelRes.revision);
-			res->insert({ convertLabelToTag(labelRes.label), labelRes });
+			res->insert({ convert_label_to_tag(labelRes.label), labelRes });
 		}
 		else
 		{
@@ -180,7 +180,7 @@ LabelMap labelDetailsToMap(std::string depotPath, LabelNameToDetails labels)
 						revToLabel.insert({ labelRes.revision, newMap });
 					}
 					auto res = revToLabel.at(labelRes.revision);
-					res->insert({ convertLabelToTag(labelRes.label), labelRes });
+					res->insert({ convert_label_to_tag(labelRes.label), labelRes });
 				}
 			}
 		}
