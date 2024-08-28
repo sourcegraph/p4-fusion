@@ -4,12 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
-#include <thread>
 #include <atomic>
+#include <string>
 #include <unordered_map>
-#include <typeinfo>
-
-#include "common.h"
 
 #include "utils/timer.h"
 #include "utils/arguments.h"
@@ -19,12 +16,12 @@
 #include "git_api.h"
 #include "branch_set.h"
 #include "tracer.h"
-#include "git2/commit.h"
 #include "labels_conversion.h"
+#include "labels_cache.h"
 
-#define P4_FUSION_VERSION "v1.14.1-sg"
+#define P4_FUSION_VERSION "v1.14.2-sg"
 
-int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath)
+int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, const std::string& cachePath)
 {
 	// Load labels
 	PRINT("Requesting labels from the Perforce server")
@@ -34,12 +31,38 @@ int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath)
 		ERR("Failed to retrieve labels for mapping: " << labelsRes.PrintError())
 		return 1;
 	}
-	const std::list<std::string>& labels = labelsRes.GetLabels();
+	const std::list<LabelsResult::LabelData>& labels = labelsRes.GetLabels();
 	SUCCESS("Received " << labels.size() << " labels from the Perforce server")
 
-	LabelMap revToLabel = getLabelsDetails(&p4, depotPath, labels);
+	LabelNameToDetails cachedLabels;
+	if (cachePath.size() > 0)
+	{
+		PRINT("Reading labels from cache")
+		cachedLabels = read_label_map_from_disk(cachePath);
+		SUCCESS("Successfully read " << cachedLabels.size() << " cached labels")
+	}
 
-	SUCCESS("Updating tags.")
+	PRINT("Comparing cached labels with labels from the Perforce server")
+	CompareResponse compResp = compare_labels_to_cache(labels, cachedLabels);
+
+	PRINT("Fetching " << compResp.labelsToFetch.size() << " new label details")
+	LabelNameToDetails fetchedLabelMap = get_labels_details(&p4, compResp.labelsToFetch);
+
+	// Join the new map with the old map
+	for (const auto& pair : fetchedLabelMap)
+	{
+		compResp.resultingLabels.insert({ pair.first, pair.second });
+	}
+
+	if (cachePath.size() > 0)
+	{
+		PRINT("Caching updated labels to " << cachePath)
+		write_label_map_to_disk(cachePath, compResp.resultingLabels, cachePath);
+	}
+
+	LabelMap revToLabel = label_details_to_map(depotPath, compResp.resultingLabels);
+
+	PRINT("Updating tags.")
 	git.CreateTagsFromLabels(revToLabel);
 	return 0;
 }
@@ -180,7 +203,7 @@ int Main(int argc, char** argv)
 
 		if (!arguments.GetNoConvertLabels())
 		{
-			return fetchAndUpdateLabels(p4, git, depotPath);
+			return fetchAndUpdateLabels(p4, git, depotPath, arguments.GetLabelCache());
 		}
 
 		return 0;
@@ -332,7 +355,7 @@ int Main(int argc, char** argv)
 	if (!arguments.GetNoConvertLabels())
 	{
 		P4API p4labelsClient;
-		return fetchAndUpdateLabels(p4labelsClient, git, depotPath);
+		return fetchAndUpdateLabels(p4labelsClient, git, depotPath, arguments.GetLabelCache());
 	}
 
 	return 0;

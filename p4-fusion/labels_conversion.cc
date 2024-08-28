@@ -6,6 +6,8 @@
 #include "git2/commit.h"
 #include "git2/types.h"
 
+#include "labels_conversion.h"
+
 // sanitizeLabelName removes characters from a label name that
 // aren't valid in git tags as specified by
 // https://git-scm.com/docs/git-check-ref-format
@@ -15,7 +17,7 @@
 // This function was LLM generated and the regex checked with
 // https://regex101.com/ . Seems to make sense, and tested
 // with a few label names.
-std::string convertLabelToTag(std::string input)
+std::string convert_label_to_tag(std::string input)
 {
 	std::string result = input;
 
@@ -87,7 +89,7 @@ std::string trimSuffix(const std::string& str, const std::string& suffix)
 }
 
 // Trim the specified prefix from the string
-std::string trimPrefix(const std::string& str, const std::string& prefix)
+std::string trim_prefix(const std::string& str, const std::string& prefix)
 {
 	if (str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0)
 	{
@@ -96,7 +98,7 @@ std::string trimPrefix(const std::string& str, const std::string& prefix)
 	return str;
 }
 
-std::string getChangelistFromCommit(const git_commit* commit)
+std::string get_changelist_from_commit(const git_commit* commit)
 {
 	// Look for the specific change message generated from the Commit method.
 	// Note that extra branching information can be added after it.
@@ -120,20 +122,37 @@ std::string getChangelistFromCommit(const git_commit* commit)
 	return cl;
 }
 
-// Fetches additional label details for each label using the provided p4 client
-// and returns a map of revision to label to label details.
-LabelMap getLabelsDetails(P4API* p4, std::string depotPath, std::list<std::string> labels)
+// Fetch the details of a list of labels. This will make requests
+// to the Perforce server equal to the number of labels in the list
+LabelNameToDetails get_labels_details(P4API* p4, std::list<LabelsResult::LabelData> labels)
 {
-	LabelMap revToLabel;
+	LabelNameToDetails labelMap;
 
 	for (auto& label : labels)
 	{
-		LabelResult labelRes = p4->Label(label);
+		LabelResult labelRes = p4->Label(label.label);
 		if (labelRes.HasError())
 		{
 			ERR("Failed to retrieve label details: " << labelRes.PrintError());
 			continue;
 		}
+		// We use the update field from the `labels` command because it's in
+		// Unix time and will be what we compare against in the future
+		labelRes.update = label.update;
+
+		labelMap.insert({ labelRes.label, labelRes });
+	}
+
+	return labelMap;
+}
+
+LabelMap label_details_to_map(std::string depotPath, LabelNameToDetails labels)
+{
+	LabelMap revToLabel;
+
+	for (auto& label : labels)
+	{
+		LabelResult labelRes = label.second;
 		if (!labelRes.revision.starts_with("@"))
 		{
 			continue;
@@ -147,7 +166,7 @@ LabelMap getLabelsDetails(P4API* p4, std::string depotPath, std::list<std::strin
 				revToLabel.insert({ labelRes.revision, newMap });
 			}
 			auto res = revToLabel.at(labelRes.revision);
-			res->insert({ convertLabelToTag(labelRes.label), labelRes });
+			res->insert({ convert_label_to_tag(labelRes.label), labelRes });
 		}
 		else
 		{
@@ -161,7 +180,7 @@ LabelMap getLabelsDetails(P4API* p4, std::string depotPath, std::list<std::strin
 						revToLabel.insert({ labelRes.revision, newMap });
 					}
 					auto res = revToLabel.at(labelRes.revision);
-					res->insert({ convertLabelToTag(labelRes.label), labelRes });
+					res->insert({ convert_label_to_tag(labelRes.label), labelRes });
 				}
 			}
 		}

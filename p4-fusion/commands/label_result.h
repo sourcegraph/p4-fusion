@@ -15,6 +15,7 @@ public:
 	std::string label;
 	std::string revision;
 	std::string description;
+	std::string update; // Last updated at time in yyyy/mm/dd hh:mm:ss
 	std::vector<std::string> views;
 
 public:
