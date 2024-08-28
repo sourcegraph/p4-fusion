@@ -19,7 +19,7 @@
 #include "labels_conversion.h"
 #include "labels_cache.h"
 
-#define P4_FUSION_VERSION "v1.14.1-sg"
+#define P4_FUSION_VERSION "v1.14.2-sg"
 
 int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, const std::string& cachePath)
 {
