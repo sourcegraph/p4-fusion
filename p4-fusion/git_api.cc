@@ -12,6 +12,7 @@
 #include "minitrace.h"
 #include "labels_conversion.h"
 #include "utils/std_helpers.h"
+#include "utils/p4_helpers.h"
 
 void checkGit2Error(int errcode)
 {
@@ -322,15 +323,16 @@ std::string GitAPI::WriteChangelistBranch(
 
 	for (auto& file : files)
 	{
+		auto relativePath = decodePath(file.GetRelativePath());
 		if (file.IsDeleted())
 		{
-			checkGit2Error(git_index_remove_bypath(idx, file.GetRelativePath().c_str()));
+			checkGit2Error(git_index_remove_bypath(idx, relativePath.c_str()));
 		}
 		else
 		{
 			git_index_entry entry = {
 				.mode = GIT_FILEMODE_BLOB,
-				.path = file.GetRelativePath().c_str(),
+				.path = relativePath.c_str(),
 			};
 
 			auto& blobOID = file.GetBlobOID();
