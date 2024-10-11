@@ -6,7 +6,6 @@
 // '#' -> "%23"
 // '*' -> "%2A"
 // '%' -> "%25"
-// ':' -> "%3A"
 std::string decodePath(std::string input)
 {
 	std::string result;
@@ -31,10 +30,6 @@ std::string decodePath(std::string input)
 			else if (hexValue == "%25")
 			{
 				result += '%';
-			}
-			else if (hexValue == "%3A")
-			{
-				result += ':';
 			}
 			else
 			{
