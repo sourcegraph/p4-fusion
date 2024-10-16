@@ -1,3 +1,3 @@
 #include <string>
 
-std::string decodePath(std::string input);
+std::string decodePath(const std::string& input);

@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <atomic>
+#include "utils/p4_helpers.h"
 #include "common.h"
 #include "utils/std_helpers.h"
 
@@ -90,7 +91,7 @@ public:
 
 	[[nodiscard]] const std::string& GetDepotFile() const { return m_data->depotFile; };
 	[[nodiscard]] const std::string& GetRevision() const { return m_data->revision; };
-	[[nodiscard]] const std::string& GetRelativePath() const { return m_data->relativePath; };
+	[[nodiscard]] std::string GetRelativePath() const { return decodePath(m_data->relativePath); };
 	[[nodiscard]] const std::string& GetBlobOID() const
 	{
 		std::lock_guard<std::mutex> lock(m_data->blobOIDMu);

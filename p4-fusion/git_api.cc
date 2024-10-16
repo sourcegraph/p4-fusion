@@ -12,7 +12,6 @@
 #include "minitrace.h"
 #include "labels_conversion.h"
 #include "utils/std_helpers.h"
-#include "utils/p4_helpers.h"
 
 void checkGit2Error(int errcode)
 {
@@ -323,7 +322,7 @@ std::string GitAPI::WriteChangelistBranch(
 
 	for (auto& file : files)
 	{
-		auto relativePath = decodePath(file.GetRelativePath());
+		auto relativePath = file.GetRelativePath();
 		if (file.IsDeleted())
 		{
 			checkGit2Error(git_index_remove_bypath(idx, relativePath.c_str()));
