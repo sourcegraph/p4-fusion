@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <atomic>
+#include "utils/p4_helpers.h"
 #include "common.h"
 #include "utils/std_helpers.h"
 
