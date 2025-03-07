@@ -13,7 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v8
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
@@ -47,7 +46,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
@@ -81,7 +79,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
@@ -106,8 +103,8 @@ jobs:
           destination: 'p4-fusion/x86_64-linux/'
           glob: 'p4-fusion*'
 
-  report_failure:
-    needs: [aarch64-darwin, x86_64-darwin, x86_64-linux]
-    if: ${{ failure() }}
-    uses: sourcegraph/sourcegraph/.github/workflows/report-job-failure.yml@main
-    secrets: inherit
+  # report_failure:
+  #   needs: [aarch64-darwin, x86_64-darwin, x86_64-linux]
+  #   if: ${{ failure() }}
+  #   uses: sourcegraph/sourcegraph/.github/workflows/report-job-failure.yml@main
+  #   secrets: inherit
