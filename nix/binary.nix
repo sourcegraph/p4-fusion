@@ -22,7 +22,7 @@ let
 in
 stdenv'.mkDerivation rec {
   name = "p4-fusion";
-  version = "v1.13.2-sg";
+  version = "v1.14.3-sg";
 
   srcs = [
     (lib.sources.cleanSource ../.)
