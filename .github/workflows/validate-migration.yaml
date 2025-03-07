@@ -217,7 +217,7 @@ jobs:
       - name: "Cache LLVM project gzip"
         if : ${{ env.BUILD_LIBCXX == 'true' }}
         id: cache-llvm-project-source
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ env.LLVM_PROJECT_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-llvm-project-gzip-${{ env.LLVM_PROJECT_DOWNLOAD_URL }}
@@ -265,7 +265,7 @@ jobs:
 
       - name: "Cache Perforce API headers gzip"
         id: cache-p4api
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ env.P4_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-p4api-gzip-${{ env.P4_DOWNLOAD_URL }}
@@ -287,7 +287,7 @@ jobs:
 
       - name: "Cache OpenSSL gzip"
         id: cache-openssl-source
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ env.OPENSSL_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-openssl-source-gzip-v2-${{ env.OPENSSL_DOWNLOAD_URL }}
