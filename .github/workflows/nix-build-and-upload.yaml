@@ -103,8 +103,8 @@ jobs:
           destination: 'p4-fusion/x86_64-linux/'
           glob: 'p4-fusion*'
 
-  # report_failure:
-  #   needs: [aarch64-darwin, x86_64-darwin, x86_64-linux]
-  #   if: ${{ failure() }}
-  #   uses: sourcegraph/sourcegraph/.github/workflows/report-job-failure.yml@main
-  #   secrets: inherit
+  report_failure:
+    needs: [aarch64-darwin, x86_64-darwin, x86_64-linux]
+    if: ${{ failure() }}
+    uses: sourcegraph/workflows/.github/workflows/report-job-failure.yml@main
+    secrets: inherit
