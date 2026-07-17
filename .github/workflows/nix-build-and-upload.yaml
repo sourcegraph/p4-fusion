@@ -9,10 +9,10 @@ on:
 jobs:
   x86_64-darwin:
     name: Build p4-fusion x86_64-darwin
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v8
+      - uses: DeterminateSystems/nix-installer-action@v22
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
@@ -45,7 +45,7 @@ jobs:
     runs-on: macos-latest-xlarge
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/nix-installer-action@v22
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/nix-installer-action@v22
       - name: '🔓 Authenticate to Google Cloud'
         uses: google-github-actions/auth@v1
         with:
