@@ -1,0 +1,95 @@
+name: scip-clang
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  index:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Install build dependencies"
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes git make cmake gcc g++ ninja-build
+
+      - name: "Cache Perforce API"
+        id: cache-p4api
+        uses: actions/cache@v4
+        with:
+          path: /tmp/p4-download
+          key: ${{ runner.os }}-p4api-r23.1
+
+      - name: "Download Perforce API"
+        if: ${{ steps.cache-p4api.outputs.cache-hit != 'true' }}
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/p4-download
+          curl -L "https://filehost.perforce.com/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.1.1.tgz" --output /tmp/p4-download/p4.tgz
+
+      - name: "Unpack Perforce API"
+        run: |
+          set -euxo pipefail
+          mkdir -p vendor/helix-core-api/linux
+          tar -C vendor/helix-core-api/linux -xzf /tmp/p4-download/p4.tgz --strip 1
+
+      - name: "Cache OpenSSL source"
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: /tmp/openssl-download
+          key: ${{ runner.os }}-openssl-1.1.1w
+
+      - name: "Download OpenSSL"
+        if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/openssl-download
+          curl -L "https://www.openssl.org/source/openssl-1.1.1w.tar.gz" --output /tmp/openssl-download/openssl.tgz
+
+      - name: "Compile OpenSSL"
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/openssl-src
+          tar -C /tmp/openssl-src -xzf /tmp/openssl-download/openssl.tgz --strip-components 1
+          cd /tmp/openssl-src
+          ./config --prefix=/tmp/openssl-install --openssldir=/tmp/openssl-install
+          make --jobs="$(($(nproc) + 1))"
+          sudo make install
+
+      - name: "Install scip-clang and src CLI"
+        run: |
+          set -euxo pipefail
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          SCIP_CLANG_TAG="$(curl -sSL https://api.github.com/repos/sourcegraph/scip-clang/releases/latest | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+          curl -L "https://github.com/sourcegraph/scip-clang/releases/download/${SCIP_CLANG_TAG}/scip-clang-x86_64-${OS}" -o scip-clang
+          chmod +x scip-clang
+          curl -L "https://sourcegraph.sourcegraph.com/.api/src-cli/src_linux_amd64" -o src
+          chmod +x src
+          echo "$(pwd)" >> "$GITHUB_PATH"
+
+      - name: "Build p4-fusion and generate compilation database"
+        env:
+          OPENSSL_ROOT_DIR: /tmp/openssl-install
+          CMAKE_EXPORT_COMPILE_COMMANDS: "ON"
+        run: |
+          set -euxo pipefail
+          ./generate_cache.sh Release
+          ./build.sh
+
+      - name: "Index with scip-clang"
+        run: |
+          set -euxo pipefail
+          scip-clang --compdb-path=build/compile_commands.json
+
+      - name: "Upload SCIP index to Sourcegraph S2"
+        env:
+          SRC_ENDPOINT: https://sourcegraph.sourcegraph.com/
+          SRC_ACCESS_TOKEN: ${{ secrets.SRC_ACCESS_TOKEN_S2 }}
+        run: |
+          set -euxo pipefail
+          src code-intel upload -github-token="${{ secrets.GITHUB_TOKEN }}" -no-progress
