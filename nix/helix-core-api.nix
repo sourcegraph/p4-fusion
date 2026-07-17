@@ -9,7 +9,7 @@
     x86_64-darwin = fetchzip {
       name = "helix-core-api";
       url = "https://filehost.perforce.com/perforce/r23.1/bin.macosx12x86_64/p4api-openssl1.1.1.tgz";
-      hash = "sha256-go7uhe6eAX+rnnn5zzmKPya93ZK65q6bL0nsDXLx0ZA=";
+      hash = "sha256-1HQXcF/3lRv5H2L2IKvWNyYYY6myTOSTttIl46UBTfY=";
     };
     x86_64-linux = fetchzip {
       name = "helix-core-api";
