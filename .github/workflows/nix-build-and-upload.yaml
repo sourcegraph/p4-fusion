@@ -19,7 +19,7 @@ jobs:
           credentials_json: ${{ secrets.CTAGS_GCP_SERVICE_ACCOUNT }}
       - name: Run `nix build`
         run: |
-          nix build .#p4-fusion_openssl1_1-static
+          nix build .#p4-fusion_openssl3-static
       - name: Sign the binary
         # signing in ./result/bin will cause a cache miss on next invocation
         run: |
@@ -52,7 +52,7 @@ jobs:
           credentials_json: ${{ secrets.CTAGS_GCP_SERVICE_ACCOUNT }}
       - name: Run `nix build`
         run: |
-          nix build .#p4-fusion_openssl1_1-static
+          nix build .#p4-fusion_openssl3-static
       - name: Sign the binary
         # signing in ./result/bin will cause a cache miss on next invocation
         run: |
@@ -85,7 +85,7 @@ jobs:
           credentials_json: ${{ secrets.CTAGS_GCP_SERVICE_ACCOUNT }}
       - name: Run `nix build`
         run: |
-          nix build .#p4-fusion_openssl1_1-static
+          nix build .#p4-fusion_openssl3-static
       - name: Rename and prepare for upload
         run: |
           mkdir -p dist

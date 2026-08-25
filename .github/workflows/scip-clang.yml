@@ -22,14 +22,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/p4-download
-          key: ${{ runner.os }}-p4api-r23.1
+          key: ${{ runner.os }}-p4api-r25.2-openssl3
 
       - name: "Download Perforce API"
         if: ${{ steps.cache-p4api.outputs.cache-hit != 'true' }}
         run: |
           set -euxo pipefail
           mkdir -p /tmp/p4-download
-          curl -L "https://filehost.perforce.com/perforce/r23.1/bin.linux26x86_64/p4api-glibc2.3-openssl1.1.1.tgz" --output /tmp/p4-download/p4.tgz
+          curl -L "https://filehost.perforce.com/perforce/r25.2/bin.linux26x86_64/p4api-glibc2.3-openssl3.tgz" --output /tmp/p4-download/p4.tgz
 
       - name: "Unpack Perforce API"
         run: |
@@ -42,14 +42,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/openssl-download
-          key: ${{ runner.os }}-openssl-1.1.1w
+          key: ${{ runner.os }}-openssl-3.0.19
 
       - name: "Download OpenSSL"
         if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
         run: |
           set -euxo pipefail
           mkdir -p /tmp/openssl-download
-          curl -L "https://www.openssl.org/source/openssl-1.1.1w.tar.gz" --output /tmp/openssl-download/openssl.tgz
+          curl -L "https://www.openssl.org/source/openssl-3.0.19.tar.gz" --output /tmp/openssl-download/openssl.tgz
 
       - name: "Compile OpenSSL"
         run: |

@@ -10,7 +10,7 @@ We highly recommend the [Determinate Systems' Nix installer](https://github.com/
 
 ## Binary targets
 
-Build targets are provided for various combinations of target OS, architecture, OpenSSL version and static vs dynamic binaries. To build e.g. a static x86_64 Linux with OpenSSL 1.1, you would run `nix build .#p4-fusion_openssl1_1-static` on a Linux machine. Check the `packages` section of `nix flake show` for the full list of targets.
+Build targets are provided for various combinations of target OS, architecture, OpenSSL version and static vs dynamic binaries. Published binaries use OpenSSL 3; to build e.g. a static x86_64 Linux binary, run `nix build .#p4-fusion_openssl3-static` on a Linux machine. Check the `packages` section of `nix flake show` for the full list of targets, including optional OpenSSL 1.1 builds.
 
 ## Troubleshooting
 
