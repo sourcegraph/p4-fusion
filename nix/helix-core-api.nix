@@ -21,17 +21,17 @@
     aarch64-darwin = fetchzip {
       name = "helix-core-api";
       url = "https://filehost.perforce.com/perforce/r25.2/bin.macosx12arm64/p4api-openssl3.tgz";
-      hash = "sha256-ab6wYii7X2qlStQrS4dKXGkHbURkEA4q1o5nwFxtkbg=";
+      hash = "sha256-BhcRie94yCYlMxgVYd9PB1yyyYQeEcvB8d51GYnbpyM=";
     };
     x86_64-darwin = fetchzip {
       name = "helix-core-api";
       url = "https://filehost.perforce.com/perforce/r25.2/bin.macosx12x86_64/p4api-openssl3.tgz";
-      hash = "sha256-yi1OrOXK5zpjWbXAwb/TNmB46y+sx3d3HIyJ10P5wfA=";
+      hash = "sha256-QlIwDusvSpswXObkJMOonevgEMUuQX8Qv4T8tXR40Xg=";
     };
     x86_64-linux = fetchzip {
       name = "helix-core-api";
       url = "https://filehost.perforce.com/perforce/r25.2/bin.linux26x86_64/p4api-glibc2.3-openssl3.tgz";
-      hash = "sha256-Edo4gVmn0JuR/twVEYA9oekC4GXQpV1PlH24j7jyLh4=";
+      hash = "sha256-G//1CFIad8B4JKShy+MBHKnaFyEcRz2/9ykrUXJbCV8=";
     };
   };
 }
