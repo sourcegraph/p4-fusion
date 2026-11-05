@@ -5,6 +5,8 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 #include <atomic>
+#include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -19,7 +21,7 @@
 #include "labels_conversion.h"
 #include "labels_cache.h"
 
-#define P4_FUSION_VERSION "v1.14.3-sg"
+#define P4_FUSION_VERSION "v1.14.4-sg"
 
 int fetchAndUpdateLabels(P4API& p4, GitAPI& git, const std::string& depotPath, const std::string& cachePath)
 {
@@ -183,174 +185,200 @@ int Main(int argc, char** argv)
 		SUCCESS("Detected last CL committed as CL " << resumeFromCL)
 	}
 
-	// Request changelists.
-	PRINT("Requesting changelists to convert from the Perforce server")
-	std::deque<ChangeList> changes;
-	{
-		ChangesResult changesRes = p4.Changes(depotPath, resumeFromCL, arguments.GetMaxChanges());
-		if (changesRes.HasError())
-		{
-			ERR("Failed to list changes: " << changesRes.PrintError())
-			return 1;
-		}
-		changes = std::move(changesRes.GetChanges());
-	}
-
-	// Return early if we have no work to do
-	if (changes.empty())
-	{
-		SUCCESS("Repository is up to date.")
-
-		if (!arguments.GetNoConvertLabels())
-		{
-			return fetchAndUpdateLabels(p4, git, depotPath, arguments.GetLabelCache());
-		}
-
-		return 0;
-	}
-	SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number)
-
 	BranchSet branchSet(P4API::ClientSpec.mapping, depotPath, arguments.GetBranches(), arguments.GetIncludeBinaries());
 	if (branchSet.Count() > 0)
 	{
 		PRINT("Inspecting " << branchSet.Count() << " branches")
 	}
 
-	// Load mapping data from usernames to emails.
-	PRINT("Requesting userbase details from the Perforce server")
-	UsersResult usersRes = p4.Users();
-	if (usersRes.HasError())
-	{
-		ERR("Failed to retrieve user details for mapping: " << usersRes.PrintError())
-		return 1;
-	}
-	const std::unordered_map<UsersResult::UserID, UsersResult::UserData>& users = usersRes.GetUserEmails();
-	SUCCESS("Received " << users.size() << " userbase details from the Perforce server")
-
-	// Create the thread pool
-	int networkThreads = arguments.GetNetworkThreads();
-	if (networkThreads > changes.size())
-	{
-		networkThreads = int(changes.size());
-	}
-	PRINT("Creating " << networkThreads << " network threads")
-	ThreadPool pool(networkThreads, srcPath, timezoneMinutes);
-	SUCCESS("Created " << pool.GetThreadCount() << " threads in thread pool")
-
-	// Go in the chronological order.
-	std::atomic<int> nextToEnqueue;
-	std::atomic<int> downloaded;
-	downloaded.store(0);
-	size_t startupDownloadsCount = arguments.GetLookAhead();
-	if (startupDownloadsCount > changes.size())
-	{
-		startupDownloadsCount = changes.size();
-	}
-	// First, we enqueue the initial set of changelists for download, at most
-	// lookAhead jobs.
-	for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
-	{
-		ChangeList& cl = changes.at(currentCL);
-
-		nextToEnqueue++;
-
-		pool.AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
-		    {
-			cl.StartDownload(p4, git, branchSet, printBatch);
-			// Mark download as done.
-			downloaded++; });
-	}
-
-	SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(startupDownloadsCount - 1).number << " for downloading")
-
-	// Commit procedure start
-	Timer commitTimer;
-
-	auto totalChanges = changes.size();
+	const int maxChanges = arguments.GetMaxChanges();
 	auto noMerge = arguments.GetNoMerge();
-	int i(0);
-	while (!changes.empty())
+	std::optional<UsersResult> usersRes;
+	std::atomic<int> downloaded;
+	// Created for the first batch and reused for later batches, which are
+	// never larger than the first one.
+	std::unique_ptr<ThreadPool> pool;
+
+	while (true)
 	{
-		// Ensure the files are downloaded before committing them to the repository
-		// First, wait until downloaded so the changelist is no longer referenced
-		// in worker threads.
-		changes.front().WaitForDownload();
-
-		// Now move the changelist and pop it off the queue.
-		// Once this iteration is over, it will be destructed
-		// and memory is freed.
-		ChangeList cl = std::move(changes.front());
-		changes.pop_front();
-
-		std::string fullName(cl.user);
-		std::string email("deleted@user");
-		if (users.find(cl.user) != users.end())
+		// Request changelists.
+		PRINT("Requesting changelists to convert from the Perforce server")
+		std::deque<ChangeList> changes;
 		{
-			fullName = users.at(cl.user).fullName;
-			email = users.at(cl.user).email;
+			ChangesResult changesRes = p4.Changes(depotPath, resumeFromCL, maxChanges);
+			if (changesRes.HasError())
+			{
+				ERR("Failed to list changes: " << changesRes.PrintError())
+				return 1;
+			}
+			changes = std::move(changesRes.GetChanges());
 		}
 
-		for (auto& branchGroup : cl.changedFileGroups->branchedFileGroups)
+		// Stop if we have no work to do
+		if (changes.empty())
 		{
-			std::string mergeFrom;
-			if (branchGroup.hasSource && !noMerge)
-			{
-				// Only perform merging if the branch group explicitly declares that the change
-				// has a source, and if the user wants merging.
-				mergeFrom = branchGroup.sourceBranch;
-			}
-
-			const std::string& commitSHA = git.WriteChangelistBranch(
-			    depotPath,
-			    cl,
-			    branchGroup.files,
-			    branchGroup.targetBranch,
-			    fullName,
-			    email,
-			    mergeFrom);
-
-#ifdef PRINT_TEST_OUTPUT
-			// For scripting/testing purposes...
-			PRINT("COMMIT:" << commitSHA << ":" << cl.number << ":" << branchGroup.targetBranch << ":")
-#endif
-			if (branchSet.Count() > 0)
-			{
-				SUCCESS(
-				    "CL " << cl.number << " --> Commit " << commitSHA
-				          << " with " << branchGroup.files.size() << " files"
-				          << (branchGroup.targetBranch.empty()
-				                     ? ""
-				                     : (" to branch " + branchGroup.targetBranch))
-				          << (branchGroup.sourceBranch.empty()
-				                     ? ""
-				                     : (" from branch " + branchGroup.sourceBranch))
-				          << ".")
-			}
+			SUCCESS("Repository is up to date.")
+			break;
 		}
-		SUCCESS(
-		    "CL " << cl.number << " with "
-		          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
-		          << "|" << downloaded
-		          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
-		          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
+		SUCCESS("Found " << changes.size() << " uncloned CLs starting from CL " << changes.front().number << " to CL " << changes.back().number)
 
-		i++;
-
-		// Once a cl has been downloaded, we check if we can enqueue a new job
-		// for background downloading.
-		if (changes.size() > (nextToEnqueue - i))
+		if (!usersRes)
 		{
-			ChangeList& downloadCL = changes.at(nextToEnqueue - i);
+			// Load mapping data from usernames to emails.
+			PRINT("Requesting userbase details from the Perforce server")
+			usersRes = p4.Users();
+			if (usersRes->HasError())
+			{
+				ERR("Failed to retrieve user details for mapping: " << usersRes->PrintError())
+				return 1;
+			}
+			SUCCESS("Received " << usersRes->GetUserEmails().size() << " userbase details from the Perforce server")
+		}
+		const std::unordered_map<UsersResult::UserID, UsersResult::UserData>& users = usersRes->GetUserEmails();
+
+		if (!pool)
+		{
+			// Create the thread pool
+			int networkThreads = arguments.GetNetworkThreads();
+			if (networkThreads > changes.size())
+			{
+				networkThreads = int(changes.size());
+			}
+			PRINT("Creating " << networkThreads << " network threads")
+			pool = std::make_unique<ThreadPool>(networkThreads, srcPath, timezoneMinutes);
+			SUCCESS("Created " << pool->GetThreadCount() << " threads in thread pool")
+		}
+
+		// Go in the chronological order.
+		std::atomic<int> nextToEnqueue;
+		downloaded.store(0);
+		size_t startupDownloadsCount = arguments.GetLookAhead();
+		if (startupDownloadsCount > changes.size())
+		{
+			startupDownloadsCount = changes.size();
+		}
+		// First, we enqueue the initial set of changelists for download, at most
+		// lookAhead jobs.
+		for (size_t currentCL = 0; currentCL < startupDownloadsCount; currentCL++)
+		{
+			ChangeList& cl = changes.at(currentCL);
+
 			nextToEnqueue++;
-			pool.AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
+
+			pool->AddJob([&downloaded, &cl, &branchSet, printBatch](P4API& p4, GitAPI& git)
 			    {
-				downloadCL.StartDownload(p4, git, branchSet, printBatch);
+				cl.StartDownload(p4, git, branchSet, printBatch);
 				// Mark download as done.
 				downloaded++; });
 		}
-	}
 
-	SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
+		SUCCESS("Queued first " << startupDownloadsCount << " CLs up until CL " << changes.at(startupDownloadsCount - 1).number << " for downloading")
+
+		// Commit procedure start
+		Timer commitTimer;
+
+		auto totalChanges = changes.size();
+		auto lastCL = changes.back().number;
+		int commits(0);
+		int i(0);
+		while (!changes.empty())
+		{
+			// Ensure the files are downloaded before committing them to the repository
+			// First, wait until downloaded so the changelist is no longer referenced
+			// in worker threads.
+			changes.front().WaitForDownload();
+
+			// Now move the changelist and pop it off the queue.
+			// Once this iteration is over, it will be destructed
+			// and memory is freed.
+			ChangeList cl = std::move(changes.front());
+			changes.pop_front();
+
+			std::string fullName(cl.user);
+			std::string email("deleted@user");
+			if (users.find(cl.user) != users.end())
+			{
+				fullName = users.at(cl.user).fullName;
+				email = users.at(cl.user).email;
+			}
+
+			for (auto& branchGroup : cl.changedFileGroups->branchedFileGroups)
+			{
+				std::string mergeFrom;
+				if (branchGroup.hasSource && !noMerge)
+				{
+					// Only perform merging if the branch group explicitly declares that the change
+					// has a source, and if the user wants merging.
+					mergeFrom = branchGroup.sourceBranch;
+				}
+
+				const std::string& commitSHA = git.WriteChangelistBranch(
+				    depotPath,
+				    cl,
+				    branchGroup.files,
+				    branchGroup.targetBranch,
+				    fullName,
+				    email,
+				    mergeFrom);
+				commits++;
+
+#ifdef PRINT_TEST_OUTPUT
+				// For scripting/testing purposes...
+				PRINT("COMMIT:" << commitSHA << ":" << cl.number << ":" << branchGroup.targetBranch << ":")
+#endif
+				if (branchSet.Count() > 0)
+				{
+					SUCCESS(
+					    "CL " << cl.number << " --> Commit " << commitSHA
+					          << " with " << branchGroup.files.size() << " files"
+					          << (branchGroup.targetBranch.empty()
+					                     ? ""
+					                     : (" to branch " + branchGroup.targetBranch))
+					          << (branchGroup.sourceBranch.empty()
+					                     ? ""
+					                     : (" from branch " + branchGroup.sourceBranch))
+					          << ".")
+				}
+			}
+			SUCCESS(
+			    "CL " << cl.number << " with "
+			          << cl.changedFileGroups->totalFileCount << " files (" << i + 1 << "/" << totalChanges
+			          << "|" << downloaded
+			          << "). Elapsed " << commitTimer.GetTimeS() / 60.0f << " mins. "
+			          << ((commitTimer.GetTimeS() / 60.0f) / (float)(i + 1)) * (totalChanges - i - 1) << " mins left.")
+
+			i++;
+
+			// Once a cl has been downloaded, we check if we can enqueue a new job
+			// for background downloading.
+			if (changes.size() > (nextToEnqueue - i))
+			{
+				ChangeList& downloadCL = changes.at(nextToEnqueue - i);
+				nextToEnqueue++;
+				pool->AddJob([&downloaded, &downloadCL, &branchSet, printBatch](P4API& p4, GitAPI& git)
+				    {
+					downloadCL.StartDownload(p4, git, branchSet, printBatch);
+					// Mark download as done.
+					downloaded++; });
+			}
+		}
+
+		SUCCESS("Completed conversion of " << totalChanges << " CLs in " << programTimer.GetTimeS() / 60.0f << " minutes, taking " << commitTimer.GetTimeS() / 60.0f << " to commit CLs")
+
+		// A CL whose files are all filtered out (binaries without
+		// --includeBinaries, files outside every --branch) produces no commit,
+		// so it cannot advance the CL marker in the HEAD commit that the next
+		// run resumes from. If a whole --maxChanges batch is like that, the next
+		// run would fetch the same batch again and the repository would never
+		// advance, so keep going from the end of this batch until something is
+		// committed. This matches sourcegraph/p4-fusion-go.
+		if (commits > 0 || maxChanges < 0 || totalChanges < size_t(maxChanges))
+		{
+			break;
+		}
+		resumeFromCL = std::to_string(lastCL);
+		WARN("None of the " << totalChanges << " CLs up to CL " << lastCL << " had files to commit; continuing with the next " << maxChanges)
+	}
 
 	if (!arguments.GetNoConvertLabels())
 	{
