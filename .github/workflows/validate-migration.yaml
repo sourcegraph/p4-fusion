@@ -164,13 +164,13 @@ jobs:
             
           EOF
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@0717577d45739eb3c851188b29f50ed6c0b2194e # v2.8.0
 
       - name: "Run sccache"
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
       - name: "Install Perforce CLI"
-        uses: perforce/setup-p4@1.0.2
+        uses: perforce/setup-p4@e10968a4d12316faa7a940be013dbe3283dd2ad8 # 1.0.2
         with:
           command: "trust -y -f"
           p4_version: 25.2
@@ -216,7 +216,7 @@ jobs:
       - name: "Cache LLVM project gzip"
         if : ${{ env.BUILD_LIBCXX == 'true' }}
         id: cache-llvm-project-source
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.LLVM_PROJECT_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-llvm-project-gzip-${{ env.LLVM_PROJECT_DOWNLOAD_URL }}
@@ -264,7 +264,7 @@ jobs:
 
       - name: "Cache Perforce API headers gzip"
         id: cache-p4api
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.P4_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-p4api-gzip-${{ env.P4_DOWNLOAD_URL }}
@@ -286,7 +286,7 @@ jobs:
 
       - name: "Cache OpenSSL gzip"
         id: cache-openssl-source
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ env.OPENSSL_DOWNLOAD_DIR }}
           key: ${{ runner.os }}-openssl-source-gzip-v2-${{ env.OPENSSL_DOWNLOAD_URL }}
