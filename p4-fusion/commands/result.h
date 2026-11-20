@@ -13,6 +13,22 @@ class Result : public ClientUser
 	Error m_Error;
 
 public:
+	Result() = default;
+	// ClientUser owns a heap-allocated mutex (setterGuard) and frees it in its
+	// destructor, so its implicit copy makes two objects free the same mutex.
+	// Copies get a fresh ClientUser instead. Error's implicit copy constructor
+	// is shallow too, but its assignment operator copies deeply.
+	Result(const Result& other)
+	    : ClientUser()
+	{
+		m_Error = other.m_Error;
+	}
+	Result& operator=(const Result& other)
+	{
+		m_Error = other.m_Error;
+		return *this;
+	}
+
 	void HandleError(Error* e) override;
 
 	[[nodiscard]] const Error& GetError() const { return m_Error; }
